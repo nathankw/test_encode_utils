@@ -151,13 +151,3 @@ class Profile:
     assert(FILE_PROFILE_NAME in PROFILE_IDS)
   except AssertionError:
     print("WARNING: The profile for file.json has underwent a name change apparently and is no longer known to this package.")
-
-  def __init__(self,profile_id):
-    """
-    Args:
-        profile_id: str. Typically the value of a record's `@id` property.
-    """
-
-    #: The normalized version of the passed-in profile_id to the constructor. The normalization
-    #: is neccessary in order to match the format of the profile IDs in the list Profile.PROFILE_IDS.
-    self.profile_id = self._set_profile_id(profile_id)
