@@ -111,3 +111,33 @@ def get_profile_ids():
      profile_ids.append(profile_id)
   return profile_ids
 
+class Profile:
+  """
+  Encapsulates knowledge about the existing profiles on the Portal and contains useful methods
+  for working with a given profile.
+
+  The user supplies a profile name, typically the value of a record's `@id` property. It will be
+  normalized to match the syntax of the profile IDs in the list returned by the function
+  `get_profile_ids()`.
+  """
+  profiles = requests.get(eu.PROFILES_URL + "?format=json",
+                          timeout=eu.TIMEOUT,
+                          headers=REQUEST_HEADERS_JSON).json()
+  private_profile_names = [x for x in profiles if x.startswith("_")] #i.e. _subtypes.
+  for i in private_profile_names:
+    profiles.pop(i)
+  del private_profile_names
+
+  profile_ids = []
+  awardless_profile_ids = []
+  for profile_name in profiles:
+    profile = profiles[profile_name]
+    profile_id = profile["id"].split("/")[-1].split(".json")[0]
+    profile_ids.append(profile_id)
+    if eu.AWARD_PROP_NAME not in profile["properties"]:
+      awardless_profile_ids.append(profile_id)
+
+  #: The list of the profile IDs spanning all public profiles on the Portal, as returned by
+  #: `get_profile_ids()`.
+  PROFILE_IDS = profile_ids
+  del profile_ids
