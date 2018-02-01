@@ -121,4 +121,3 @@ class Profile:
   `get_profile_ids()`.
   """
   profiles = requests.get(eu.PROFILES_URL + "?format=json", timeout=eu.TIMEOUT, headers=REQUEST_HEADERS_JSON)
-  profiles = profiles.json()
