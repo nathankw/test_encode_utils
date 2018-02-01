@@ -1,0 +1,9 @@
+.nfs*
+test
+*.pyc
+/dcc_submitters.json
+*.txt
+!LICENSE.txt
+docs/_build
+docs/_static
+docs/_templates
