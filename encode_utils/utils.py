@@ -137,7 +137,3 @@ class Profile:
     if eu.AWARD_PROP_NAME not in profile["properties"]:
       awardless_profile_ids.append(profile_id)
 
-  #: The list of the profile IDs spanning all public profiles on the Portal, as returned by
-  #: `get_profile_ids()`.
-  PROFILE_IDS = profile_ids
-  del profile_ids
