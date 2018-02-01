@@ -120,7 +120,5 @@ class Profile:
   normalized to match the syntax of the profile IDs in the list returned by the function
   `get_profile_ids()`.
   """
-  profiles = requests.get(eu.PROFILES_URL + "?format=json",
-                          timeout=eu.TIMEOUT,
-                          headers=REQUEST_HEADERS_JSON)
+  profiles = requests.get(eu.PROFILES_URL + "?format=json", timeout=eu.TIMEOUT, headers=REQUEST_HEADERS_JSON)
   profiles = profiles.json()
