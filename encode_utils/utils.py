@@ -120,37 +120,38 @@ class Profile:
   normalized to match the syntax of the profile IDs in the list returned by the function
   `get_profile_ids()`.
   """
-  profiles = requests.get(eu.PROFILES_URL + "?format=json",
-                          timeout=eu.TIMEOUT,
-                          headers=REQUEST_HEADERS_JSON).json()
-  private_profile_names = [x for x in profiles if x.startswith("_")] #i.e. _subtypes.
-  for i in private_profile_names:
-    profiles.pop(i)
-  del private_profile_names
-
-  profile_ids = []
-  awardless_profile_ids = []
-  for profile_name in profiles:
-    profile = profiles[profile_name]
-    profile_id = profile["id"].split("/")[-1].split(".json")[0]
-    profile_ids.append(profile_id)
-    if eu.AWARD_PROP_NAME not in profile["properties"]:
-      awardless_profile_ids.append(profile_id)
-
-  #: The list of the profile IDs spanning all public profiles on the Portal, as returned by
-  #: `get_profile_ids()`.
-  PROFILE_IDS = profile_ids
-  del profile_ids
-
-  #: List of profile IDs that don't have the 'award' and 'lab' properties.
-  AWARDLESS_PROFILES = awardless_profile_ids
-  del awardless_profile_ids
-
-  FILE_PROFILE_NAME = "file"
-  try:
-    assert(FILE_PROFILE_NAME in PROFILE_IDS)
-  except AssertionError:
-    print("WARNING: The profile for file.json has underwent a name change apparently and is no longer known to this package.")
+  profiles = [1,2]
+  #profiles = requests.get(eu.PROFILES_URL + "?format=json",
+#                          timeout=eu.TIMEOUT,
+#                          headers=REQUEST_HEADERS_JSON).json()
+#  private_profile_names = [x for x in profiles if x.startswith("_")] #i.e. _subtypes.
+#  for i in private_profile_names:
+#    profiles.pop(i)
+#  del private_profile_names
+#
+#  profile_ids = []
+#  awardless_profile_ids = []
+#  for profile_name in profiles:
+#    profile = profiles[profile_name]
+#    profile_id = profile["id"].split("/")[-1].split(".json")[0]
+#    profile_ids.append(profile_id)
+#    if eu.AWARD_PROP_NAME not in profile["properties"]:
+#      awardless_profile_ids.append(profile_id)
+#
+#  #: The list of the profile IDs spanning all public profiles on the Portal, as returned by
+#  #: `get_profile_ids()`.
+#  PROFILE_IDS = profile_ids
+#  del profile_ids
+#
+#  #: List of profile IDs that don't have the 'award' and 'lab' properties.
+#  AWARDLESS_PROFILES = awardless_profile_ids
+#  del awardless_profile_ids
+#
+#  FILE_PROFILE_NAME = "file"
+#  try:
+#    assert(FILE_PROFILE_NAME in PROFILE_IDS)
+#  except AssertionError:
+#    print("WARNING: The profile for file.json has underwent a name change apparently and is no longer known to this package.")
 
   def __init__(self,profile_id):
     """
