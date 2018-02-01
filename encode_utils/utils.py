@@ -123,4 +123,3 @@ class Profile:
   profiles = requests.get(eu.PROFILES_URL + "?format=json",
                           timeout=eu.TIMEOUT,
                           headers=REQUEST_HEADERS_JSON).json()
-  private_profile_names = [x for x in profiles if x.startswith("_")] #i.e. _subtypes.
