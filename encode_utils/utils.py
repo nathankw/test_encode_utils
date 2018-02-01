@@ -124,16 +124,3 @@ class Profile:
                           timeout=eu.TIMEOUT,
                           headers=REQUEST_HEADERS_JSON).json()
   private_profile_names = [x for x in profiles if x.startswith("_")] #i.e. _subtypes.
-  for i in private_profile_names:
-    profiles.pop(i)
-  del private_profile_names
-
-  profile_ids = []
-  awardless_profile_ids = []
-  for profile_name in profiles:
-    profile = profiles[profile_name]
-    profile_id = profile["id"].split("/")[-1].split(".json")[0]
-    profile_ids.append(profile_id)
-    if eu.AWARD_PROP_NAME not in profile["properties"]:
-      awardless_profile_ids.append(profile_id)
-
