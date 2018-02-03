@@ -1,7 +1,7 @@
 tests\.test\_utils
 ------------------
 
-.. automodule:: encode_utils.connection
+.. automodule:: tests.test_utils
    :members:
    :private-members:
    :show-inheritance:
