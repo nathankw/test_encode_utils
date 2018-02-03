@@ -13,6 +13,7 @@ import unittest
 
 from encode_utils import utils
 
+#: Hey bob
 DATA_DIR = "data"
 
 class TestUtils(unittest.TestCase):
