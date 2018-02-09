@@ -24,13 +24,10 @@ import encode_utils as eu
 #: Stores the HTTP headers to indicate JSON content in a request. 
 REQUEST_HEADERS_JSON = {'content-type': 'application/json'}
 
-#: A descendent logger of the debug logger created in `encode_utils`
-#: (see the function description for `encode_utils._create_debug_logger`)
-DEBUG_LOGGER = logging.getLogger(eu.DEBUG_LOGGER_NAME + "." + __name__)
-#: A descendent logger of the error logger created in `encode_utils`
-#: (see the function description for `encode_utils._create_error_logger`)
-ERROR_LOGGER = logging.getLogger(eu.ERROR_LOGGER_NAME + "." + __name__)
-
+#: A debug `logging` instance.
+DEBUG_LOGGER = logging.getLogger(eu.DEBUG_LOGGER_NAME + "." + __name__)                                
+#: An error `logging` instance.
+ERROR_LOGGER = logging.getLogger(eu.ERROR_LOGGER_NAME + "." + __name__) 
 
 def calculate_md5sum(file_path):
   """"Calculates the md5sum for a file.
@@ -72,7 +69,7 @@ def clean_alias_name(alias):
   Returns:
       `str`: The cleaned alias.
 
-  **Example**::
+  Example::
         
         clean_alias_name("michael-snyder:a/troublesome\alias")
         # Returns michael-snyder:a_troublesome_alias
@@ -119,6 +116,44 @@ def create_subprocess(cmd,check_retcode=True):
   else:
     return popen
 
+def add_alias_prefix(aliases,prefix=False):
+  """
+  Given a list of aliases, adds the lab prefix to each one that doesn't yet have a prefix set. 
+  The lab prefix is taken as the passed-in `prefix`, otherwise, it defaults to the `DCC_LAB`
+  environment variable. 
+
+  Args: 
+      aliases: `list` of aliases.
+ 
+  Returns: 
+      `list`. 
+  
+  Example::
+
+        add_alias_prefix(aliases=["my-alias"],prefix="michael-snyder")
+        # Returns ["michael-snyder:my-alias"]
+
+        add_alias_prefix(aliases=["some-prefix:my-alias"],prefix="michael-snyder")
+        # Returns ["some-refix:my-alias"]
+
+  """
+  if not prefix:
+    prefix = eu.LAB_PREFIX
+    if not prefix:
+      return aliases #Nothing to do.
+  else:
+    if not prefix.endswith(":"):
+      prefix += ":"
+
+  res = []
+  for i in aliases:
+    if ":" in i:
+      #A prefix is already set.
+      res.append(i)
+    else:
+      res.append(prefix + i)
+  return res
+
 def strip_alias_prefix(alias):
   """
   Splits 'alias' on ':' to strip off any alias prefix. Aliases have a lab-specific prefix with
@@ -131,7 +166,7 @@ def strip_alias_prefix(alias):
   Returns:
       `str`: The alias without the lab prefix.
 
-  **Example**:: 
+  Example:: 
 
         strip_alias_prefix("michael-snyder:B-167")
         # Returns "B-167"
@@ -153,30 +188,30 @@ def add_to_set(entries,new):
   unique_list = list(set(entries))
   return unique_list
 
-def does_lib_replicate_exist(replicates_json,lib_accession,biologicial_replicate_number=False,technical_replicate_number=False):
+def does_lib_replicate_exist(replicates_json,lib_accession,biological_replicate_number=False,technical_replicate_number=False):
   """
   Regarding the replicates on the specified experiment, determines whether any of them belong
-  to the specified library.  Optional constraints are the biologicial_replicate_number and
+  to the specified library.  Optional constraints are the biological_replicate_number and
   the technical_replicate_number props of the replicates.
 
   Args:
       replicates_json: `list`. The value of the `replicates` property of an Experiment record.
       lib_accession: `str`. The value of a library object's 'accession' property.
-      biologicial_replicate_number: int. The biological replicate number.
+      biological_replicate_number: int. The biological replicate number.
       technical_replicate_number: int. The technical replicate number.
 
   Returns:
       `list`: The replicate UUIDs that pass the search constraints.
   """
-  biologicial_replicate_number = int(biologicial_replicate_number)
+  biological_replicate_number = int(biological_replicate_number)
   technical_replicate_number = int(technical_replicate_number)
   results = [] #list of replicate UUIDs.
   for rep in replicates_json:
     rep_id = rep["uuid"]
     if not lib_accession == rep["library"]["accession"]:
       continue
-    if biologicial_replicate_number:
-      if biologicial_replicate_number != rep["biological_replicate_number"]:
+    if biological_replicate_number:
+      if biological_replicate_number != rep["biological_replicate_number"]:
         continue
     if technical_replicate_number:
       if technical_replicate_number != rep["technical_replicate_number"]:
