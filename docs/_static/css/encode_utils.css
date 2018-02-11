@@ -1,6 +1,9 @@
+/*
 .wy-table-responsive table td {
-    white-space: normal !important;
+    white-space: normal;
 }
 .wy-table-responsive {
-    overflow: visible !important;
+    overflow: visible;
 }
+
+*/
