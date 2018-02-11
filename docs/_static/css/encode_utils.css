@@ -1,6 +1,10 @@
 .wy-nav-content {
-  max-width: 1200px;
+  max-width: 1000px;
   /* Default on RTD is 800px. */
+}
+
+.wy-table-responsive table th {
+  white-space: nowrap;
 }
 
 /* The below comes 
