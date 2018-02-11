@@ -1,4 +1,11 @@
-/*
+.wy-nav-content {
+  max-width: 1200px;
+  /* Default on RTD is 800px. */
+}
+
+/* The below comes 
+   from https://sphinx-argparse.readthedocs.io/en/stable/misc.html#text-wrapping-in-argument-tables
+*/
 .wy-table-responsive table td {
     white-space: normal;
 }
@@ -6,4 +13,3 @@
     overflow: visible;
 }
 
-*/
