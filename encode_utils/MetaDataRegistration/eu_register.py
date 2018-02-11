@@ -44,7 +44,7 @@ import encode_utils.profiles as eup
 
 
 def get_parser():
-  parser = argparse.ArgumentParser(parents=[dcc_login_parser],description=__doc__,formatter_class=argparse.RawTextHelpFormatter)
+  parser = argparse.ArgumentParser(parents=[dcc_login_parser],description=__doc__,formatter_class=argparse.RawDescriptionHelpFormatter)
 
   parser.add_argument("-p","--profile_id",required=True,help="""
     The ID of the profile to submit to, i.e. use 'genetic_modification' for 
