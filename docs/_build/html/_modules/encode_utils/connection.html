@@ -1,0 +1,1223 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>encode_utils.connection &#8212; ENCODE Utils 0.3.0 documentation</title>
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.3.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for encode_utils.connection</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+
+<span class="c1">###</span>
+<span class="c1"># © 2018 The Board of Trustees of the Leland Stanford Junior University</span>
+<span class="c1"># Nathaniel Watson</span>
+<span class="c1"># nathankw@stanford.edu</span>
+<span class="c1">###</span>
+
+<span class="kn">import</span> <span class="nn">base64</span>
+<span class="kn">import</span> <span class="nn">datetime</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">mimetypes</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">pdb</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">requests</span>
+<span class="kn">from</span> <span class="nn">requests.packages.urllib3.exceptions</span> <span class="k">import</span> <span class="n">InsecureRequestWarning</span>
+<span class="kn">import</span> <span class="nn">subprocess</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">import</span> <span class="nn">urllib</span>
+<span class="kn">import</span> <span class="nn">urllib3</span>
+
+<span class="c1">#inhouse libraries</span>
+<span class="kn">import</span> <span class="nn">encode_utils</span> <span class="k">as</span> <span class="nn">eu</span>
+<span class="kn">import</span> <span class="nn">encode_utils.profiles</span> <span class="k">as</span> <span class="nn">eup</span>
+<span class="kn">import</span> <span class="nn">encode_utils.utils</span> <span class="k">as</span> <span class="nn">euu</span>
+
+
+<span class="c1">#: The directory that contains the log files created by the `Connection` class.</span>
+<span class="n">LOG_DIR</span> <span class="o">=</span> <span class="s2">&quot;EU_Logs&quot;</span>
+
+<span class="n">requests</span><span class="o">.</span><span class="n">packages</span><span class="o">.</span><span class="n">urllib3</span><span class="o">.</span><span class="n">disable_warnings</span><span class="p">(</span><span class="n">InsecureRequestWarning</span><span class="p">)</span>
+<span class="c1">#urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)</span>
+
+<div class="viewcode-block" id="AwardPropertyMissing"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.AwardPropertyMissing">[docs]</a><span class="k">class</span> <span class="nc">AwardPropertyMissing</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+  <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">  Raised when the `award` property isn&#39;t set in the payload when doing a POST, and a default isn&#39;t</span>
+<span class="sd">  set by the environment variable `DDCC_AWARD` either.</span>
+<span class="sd">  &quot;&quot;&quot;</span>
+  <span class="n">message</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;The property &#39;</span><span class="si">{}</span><span class="s2">&#39; is missing from the payload and a default isn&#39;t set either. To&quot;</span>
+             <span class="s2">&quot; store a default, set the DCC_AWARD environment variable.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="FileUploadFailed"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.FileUploadFailed">[docs]</a><span class="k">class</span> <span class="nc">FileUploadFailed</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+  <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">  Raised when the AWS CLI returns a non-zero exit status.</span>
+<span class="sd">  &quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="LabPropertyMissing"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.LabPropertyMissing">[docs]</a><span class="k">class</span> <span class="nc">LabPropertyMissing</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+  <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">  Raised when the `lab` property isn&#39;t set in the payload when doing a POST, and a default isn&#39;t</span>
+<span class="sd">  set by the environment variable `DCC_LAB` either.</span>
+<span class="sd">  &quot;&quot;&quot;</span>
+  <span class="n">message</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;The property &#39;</span><span class="si">{}</span><span class="s2">&#39; is missing from the payload and a default isn&#39;t set either. To&quot;</span>
+             <span class="s2">&quot; store a default, set the DCC_LAB environment variable.&quot;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="ProfileNotSpecified"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.ProfileNotSpecified">[docs]</a><span class="k">class</span> <span class="nc">ProfileNotSpecified</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+  <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">  Raised when the profile (object schema) to submit to isn&#39;t specifed in a POST payload.</span>
+<span class="sd">  &quot;&quot;&quot;</span>
+  <span class="k">pass</span></div>
+
+
+<span class="k">class</span> <span class="nc">RecordIdNotPresent</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+  <span class="k">pass</span>
+
+
+<div class="viewcode-block" id="RecordNotFound"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.RecordNotFound">[docs]</a><span class="k">class</span> <span class="nc">RecordNotFound</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+  <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">  Raised when a record that should exist on the Portal can&#39;t be retrieved via a GET request.</span>
+<span class="sd">  &quot;&quot;&quot;</span>
+  <span class="k">pass</span></div>
+
+
+<div class="viewcode-block" id="Connection"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.Connection">[docs]</a><span class="k">class</span> <span class="nc">Connection</span><span class="p">():</span>
+  <span class="sd">&quot;&quot;&quot;Handles communication with the Portal regarding data submission and retrieval.</span>
+
+<span class="sd">  In order to authenticate with the DCC servers when making HTTP requests, you must have the</span>
+<span class="sd">  the environment variables `DCC_API_KEY` and `DCC_SECRET_KEY` set. Check with your DCC data wrangler</span>
+<span class="sd">  if you haven&#39;t been assigned these keys.</span>
+
+<span class="sd">  There are three log files opened in append mode in the directory specified by ``connection.LOG_DIR`` that</span>
+<span class="sd">  are specific to whichver Portal you are connected to. When connected to Production, each log file</span>
+<span class="sd">  name will include the token &#39;_prod_&#39;. For Development, the token will be &#39;_dev_&#39;. The three </span>
+<span class="sd">  log files are named accordingly in reference to their purpose, and are classified as:</span>
+
+<span class="sd">  1. debug log file - All messages sent to STDOUT are also written to this log file. In addition,</span>
+<span class="sd">     all messages written to the error log file described below are logged here.</span>
+<span class="sd">  2. error log file - Only terse error messages are sent to this log file for quick scanning of </span>
+<span class="sd">     any potential issues. If you identify an error here that needs more explanation, then you </span>
+<span class="sd">     should consult the debug log file.</span>
+<span class="sd">  3. posted log file - Tabulates what was successfully POSTED. There are three tab-delimited </span>
+<span class="sd">     colummns ordered as submission timestamp, record alias, and record accession (or UUID if </span>
+<span class="sd">     the `accession` property doesn&#39;t exist for the profile of the record at hand). Note that if a </span>
+<span class="sd">     record has several aliases, then only the first one in the list for the `aliases` property is </span>
+<span class="sd">     used.</span>
+<span class="sd">  &quot;&quot;&quot;</span>
+
+  <span class="c1">#: Identifies the name of the key in the payload that stores a valid ENCODE-assigned</span>
+  <span class="c1">#: identifier for a record, such as alias, accession, uuid, md5sum, ... depending on </span>
+  <span class="c1">#: the object being submitted.</span>
+  <span class="c1">#: This is not a valid property of any ENCODE object schema, and is used in the ``patch()``</span>
+  <span class="c1">#: (and ``send()`` when doing a PATCH) instance method  to designate the record to update.</span>
+  <span class="n">ENCID_KEY</span> <span class="o">=</span> <span class="s2">&quot;_enc_id&quot;</span>
+
+  <span class="c1">#: Identifies the name of the key in the payload that stores the ID of the profile</span>
+  <span class="c1">#: to submit to. Like ``ENCID_KEY``, this is a non-schematic key that is used only internally.</span>
+  <span class="n">PROFILE_KEY</span> <span class="o">=</span> <span class="s2">&quot;_profile&quot;</span>
+
+  <span class="c1">#: Constant </span>
+  <span class="n">POST</span> <span class="o">=</span> <span class="s2">&quot;post&quot;</span>
+  <span class="c1">#: Constant </span>
+  <span class="n">PATCH</span> <span class="o">=</span> <span class="s2">&quot;patch&quot;</span>
+
+  <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">dcc_mode</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+
+    <span class="c1">#: A reference to the `debug` logging instance that was created earlier in ``encode_utils.debug_logger``.</span>
+    <span class="c1">#: This class adds a file handler, such that all messages send to it are logged to this</span>
+    <span class="c1">#: file in addition to STDOUT.</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">debug_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">eu</span><span class="o">.</span><span class="n">DEBUG_LOGGER_NAME</span><span class="p">)</span>
+    <span class="c1">#: An indication of which Portal instance to use. Set to &#39;prod&#39; for the production Portal, </span>
+    <span class="c1">#: and &#39;dev&#39; for the development Portal. Leaving the default of None means to use the value</span>
+    <span class="c1">#: of the `DCC_MODE` environment variable.</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">dcc_mode</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_set_dcc_mode</span><span class="p">(</span><span class="n">dcc_mode</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">dcc_host</span> <span class="o">=</span> <span class="n">eu</span><span class="o">.</span><span class="n">DCC_MODES</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">dcc_mode</span><span class="p">][</span><span class="s2">&quot;host&quot;</span><span class="p">]</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">dcc_url</span> <span class="o">=</span> <span class="n">eu</span><span class="o">.</span><span class="n">DCC_MODES</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">dcc_mode</span><span class="p">][</span><span class="s2">&quot;url&quot;</span><span class="p">]</span>
+   
+    <span class="c1">#Add debug file handler to debug_logger:</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_add_file_handler</span><span class="p">(</span><span class="n">logger</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">debug_logger</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">,</span><span class="n">tag</span><span class="o">=</span><span class="s2">&quot;debug&quot;</span><span class="p">)</span>
+
+    <span class="c1">#: A ``logging`` instance with a file handler for logging terse error messages.</span>
+    <span class="c1">#: The log file resides locally within the directory specified by the constant </span>
+    <span class="c1">#: ``connection.LOG_DIR``. Accepts messages &gt;= ``logging.ERROR``.</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">error_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">eu</span><span class="o">.</span><span class="n">ERROR_LOGGER_NAME</span><span class="p">)</span>
+    <span class="n">log_level</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">ERROR</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">error_logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">log_level</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_add_file_handler</span><span class="p">(</span><span class="n">logger</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">error_logger</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="n">log_level</span><span class="p">,</span><span class="n">tag</span><span class="o">=</span><span class="s2">&quot;error&quot;</span><span class="p">)</span>
+
+    <span class="c1">#: A ``logging`` instance with a file handler for logging successful POST operations.</span>
+    <span class="c1">#: The log file resides locally within the directory specified by the constant </span>
+    <span class="c1">#: ``connection.LOG_DIR``. Accepts messages &gt;= ``logging.INFO``.</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">post_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">eu</span><span class="o">.</span><span class="n">POST_LOGGER_NAME</span><span class="p">)</span>
+    <span class="n">log_level</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">INFO</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">post_logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">log_level</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_add_file_handler</span><span class="p">(</span><span class="n">logger</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">post_logger</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="n">log_level</span><span class="p">,</span><span class="n">tag</span><span class="o">=</span><span class="s2">&quot;posted&quot;</span><span class="p">)</span>
+
+
+    <span class="c1">#: The API key to use when authenticating with the DCC servers. This is set automatically</span>
+    <span class="c1">#: to the value of the `DCC_API_KEY` environment variable in the ``_set_api_keys()`` private </span>
+    <span class="c1">#: instance method.</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">api_key</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_set_api_keys</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="c1">#: The secret key to use when authenticating with the DCC servers. This is set automatically</span>
+    <span class="c1">#: to the value of the `DCC_SECRET_KEY` environment variable in the ``_set_api_keys()`` private </span>
+    <span class="c1">#: instance method.</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">secret_key</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_set_api_keys</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">auth</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">api_key</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">secret_key</span><span class="p">)</span>
+
+  <span class="k">def</span> <span class="nf">_set_dcc_mode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">dcc_mode</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">dcc_mode</span><span class="p">:</span>
+      <span class="k">try</span><span class="p">:</span>
+        <span class="n">dcc_mode</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;DCC_MODE&quot;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">debug_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Utilizing DCC_MODE environment variable.&quot;</span><span class="p">)</span>
+      <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;You must supply the `dcc_mode` argument or set the environment variable DCC_MODE.&quot;</span><span class="p">)</span>
+    <span class="n">dcc_mode</span> <span class="o">=</span> <span class="n">dcc_mode</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">dcc_mode</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">eu</span><span class="o">.</span><span class="n">DCC_MODES</span><span class="p">:</span>
+      <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span>
+        <span class="s2">&quot;The specified dcc_mode of &#39;</span><span class="si">{}</span><span class="s2">&#39; is not valid. Should be one of &#39;</span><span class="si">{}</span><span class="s2">&#39; or &#39;</span><span class="si">{}</span><span class="s2">&#39;.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">dcc_mode</span><span class="p">,</span> <span class="n">eu</span><span class="o">.</span><span class="n">DCC_MODES</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
+    <span class="k">return</span> <span class="n">dcc_mode</span>
+
+  <span class="k">def</span> <span class="nf">_get_logfile_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">log_level</span><span class="p">,</span><span class="n">tag</span><span class="p">):</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">LOG_DIR</span><span class="p">):</span>
+      <span class="n">os</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">LOG_DIR</span><span class="p">)</span>
+    <span class="n">filename</span> <span class="o">=</span> <span class="s2">&quot;log_eu_&quot;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">dcc_mode</span> <span class="o">+</span> <span class="s2">&quot;_&quot;</span> <span class="o">+</span> <span class="n">tag</span> <span class="o">+</span> <span class="s2">&quot;.txt&quot;</span>
+    <span class="n">filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">LOG_DIR</span><span class="p">,</span><span class="n">filename</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">filename</span>
+
+  <span class="k">def</span> <span class="nf">_add_file_handler</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">logger</span><span class="p">,</span><span class="n">level</span><span class="p">,</span><span class="n">tag</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Creates a logger that logs messages at the ERROR level or greater. There is a single handler,</span>
+<span class="sd">    which logs its messages to a file by the name of log_eu_$DCC_MODE_error.txt.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">f_formatter</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">Formatter</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%(asctime)s</span><span class="s1">:</span><span class="si">%(name)s</span><span class="s1">:</span><span class="se">\t</span><span class="si">%(message)s</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">filename</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_logfile_name</span><span class="p">(</span><span class="n">level</span><span class="p">,</span><span class="n">tag</span><span class="p">)</span>
+    <span class="n">handler</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">FileHandler</span><span class="p">(</span><span class="n">filename</span><span class="o">=</span><span class="n">filename</span><span class="p">,</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;a&quot;</span><span class="p">)</span>
+    <span class="n">handler</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">level</span><span class="p">)</span>
+    <span class="n">handler</span><span class="o">.</span><span class="n">setFormatter</span><span class="p">(</span><span class="n">f_formatter</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">handler</span><span class="p">)</span>
+
+  <span class="k">def</span> <span class="nf">_set_api_keys</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Retrieves the API key and secret key based on the environment variables `DCC_API_KEY` and</span>
+<span class="sd">    `DCC_SECRET_KEY`.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        `tuple`: Two item tuple containing the API Key and the Secret Key</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">api_key</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;DCC_API_KEY&quot;</span><span class="p">]</span>
+    <span class="n">secret_key</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;DCC_SECRET_KEY&quot;</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">api_key</span><span class="p">,</span><span class="n">secret_key</span>
+
+  <span class="k">def</span> <span class="nf">_log_post</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">alias</span><span class="p">,</span><span class="n">dcc_id</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Uses the self.post_logger to log the submitted object&#39;s alias and dcc_id.</span>
+
+<span class="sd">    Each message is written in a two column format delimted by a tab character. The columns are:</span>
+<span class="sd">      1) alias (the first that appeared in the &#39;aliases&#39; key in the payload), and</span>
+<span class="sd">      2) DCC identifier</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">entry</span> <span class="o">=</span> <span class="n">alias</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="n">dcc_id</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">post_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Connection.log_error"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.Connection.log_error">[docs]</a>  <span class="k">def</span> <span class="nf">log_error</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">msg</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Sends &#39;msg&#39; to both ``self.error_logger`` and ``self.debug_logger``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">debug_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">error_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Connection.get_aliases"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.Connection.get_aliases">[docs]</a>  <span class="k">def</span> <span class="nf">get_aliases</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">dcc_id</span><span class="p">,</span><span class="n">strip_alias_prefix</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Given an ENCODE identifier for an object, performs a GET request and extracts the aliases.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        dcc_id: `str`. The ENCODE ID for a given object, i.e ENCSR999EHG.</span>
+<span class="sd">        strip_alias_prefix: `bool`. `True` means to remove the alias prefix if all return aliases.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        `list`: The aliases.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">record</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ignore404</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">dcc_id</span><span class="o">=</span><span class="n">dcc_id</span><span class="p">)</span>
+    <span class="n">aliases</span> <span class="o">=</span> <span class="n">record</span><span class="p">[</span><span class="s2">&quot;aliases&quot;</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">aliases</span><span class="p">)):</span>
+      <span class="n">alias</span> <span class="o">=</span> <span class="n">aliases</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+      <span class="k">if</span> <span class="n">strip_alias_prefix</span><span class="p">:</span>
+        <span class="n">aliases</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span>  <span class="n">euu</span><span class="o">.</span><span class="n">strip_alias_prefix</span><span class="p">(</span><span class="n">alias</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">aliases</span></div>
+
+<div class="viewcode-block" id="Connection.make_search_url"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.Connection.make_search_url">[docs]</a>  <span class="k">def</span> <span class="nf">make_search_url</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">search_args</span><span class="p">,</span><span class="n">limit</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Creates a URL encoded URL given the search arguments.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        search_args: `dict`. The key and value query parameters.</span>
+<span class="sd">        limit: `int`. The number of search results to return. Don&#39;t specify if you want all. </span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        `str`: The URL containing the URL encoded query.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">limit</span><span class="p">:</span>
+      <span class="n">search_args</span><span class="p">[</span><span class="s2">&quot;limit&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;all&quot;</span>
+    <span class="k">else</span><span class="p">:</span>
+      <span class="n">search_args</span><span class="p">[</span><span class="s2">&quot;limit&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">limit</span><span class="p">)</span>
+
+    <span class="c1">#Convert dict to list of two-item tuples since order of search arguments will be preserved </span>
+    <span class="c1"># this way per the documentation (easier for the corresponding test case).</span>
+    <span class="n">search</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">search_args</span><span class="o">.</span><span class="n">items</span><span class="p">())</span>
+    <span class="n">query</span> <span class="o">=</span> <span class="n">urllib</span><span class="o">.</span><span class="n">parse</span><span class="o">.</span><span class="n">urlencode</span><span class="p">(</span><span class="n">search</span><span class="p">)</span>
+    <span class="n">url</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dcc_url</span><span class="p">,</span><span class="s2">&quot;search/?&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="n">query</span>
+    <span class="k">return</span> <span class="n">url</span></div>
+
+<div class="viewcode-block" id="Connection.search"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.Connection.search">[docs]</a>  <span class="k">def</span> <span class="nf">search</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">search_args</span><span class="p">,</span><span class="n">limit</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Searches the Portal using the provided query parameters, which will first be URL encoded.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        search_args: `dict`. The key and value query parameters.</span>
+<span class="sd">        limit: `int`. The number of search results to return. Don&#39;t specify if you want all. </span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        `list`: The search results.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        requests.exceptions.HTTPError: The status code is not ok and != 404.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        Given we have the following dictionary *d* of key and value pairs::</span>
+
+<span class="sd">            {&quot;type&quot;: &quot;experiment&quot;,</span>
+<span class="sd">             &quot;searchTerm&quot;: &quot;ENCLB336TVW&quot;,</span>
+<span class="sd">             &quot;format&quot;: &quot;json&quot;,</span>
+<span class="sd">             &quot;frame&quot;: &quot;object&quot;,</span>
+<span class="sd">             &quot;datastore&quot;: &quot;database&quot;</span>
+<span class="sd">            }</span>
+
+<span class="sd">        We can call the method as::</span>
+
+<span class="sd">            search_encode(search_args=d)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">url</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_search_url</span><span class="p">(</span><span class="n">search_args</span><span class="o">=</span><span class="n">search_args</span><span class="p">,</span><span class="n">limit</span><span class="o">=</span><span class="n">limit</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">debug_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Searching DCC with query </span><span class="si">{url}</span><span class="s2">.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="n">url</span><span class="p">))</span>
+    <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">,</span>
+                            <span class="n">auth</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">auth</span><span class="p">,</span>
+                            <span class="n">timeout</span><span class="o">=</span><span class="n">eu</span><span class="o">.</span><span class="n">TIMEOUT</span><span class="p">,</span>
+                            <span class="n">headers</span><span class="o">=</span><span class="n">euu</span><span class="o">.</span><span class="n">REQUEST_HEADERS_JSON</span><span class="p">,</span>
+                            <span class="n">verify</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">status_code</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">status_code</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">response</span><span class="o">.</span><span class="n">ok</span> <span class="ow">and</span> <span class="n">status_code</span> <span class="o">!=</span> <span class="n">requests</span><span class="o">.</span><span class="n">codes</span><span class="o">.</span><span class="n">NOT_FOUND</span><span class="p">:</span>
+      <span class="n">response</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()[</span><span class="s2">&quot;@graph&quot;</span><span class="p">]</span> <span class="c1">#the @graph object is a list</span></div>
+
+
+<div class="viewcode-block" id="Connection.get_profile_from_payload"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.Connection.get_profile_from_payload">[docs]</a>  <span class="k">def</span> <span class="nf">get_profile_from_payload</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">payload</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Useful to call when doing a POST (and ``self.post()`` does call this). Ensures that the profile key</span>
+<span class="sd">    identified by ``self.PROFILE_KEY`` exists in the passed-in payload and that the value is</span>
+<span class="sd">    a recognized ENCODE object profile (schema) identifier. Alternatively, the user can set the profile in </span>
+<span class="sd">    the more convoluted `@id` property.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        payload: `dict`. The intended object data to POST.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        `str`: The ID of the profile if all validations pass, otherwise.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        encode_utils.connection.ProfileNotSpecified: Both keys ``self.PROFILE_KEY`` and `@id` are</span>
+<span class="sd">          missing in the payload.</span>
+<span class="sd">        encode_utils.profiles.UnknownProfile: The profile ID isn&#39;t recognized by the class</span>
+<span class="sd">            `encode_utils.profiles.Profile`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">profile_id</span> <span class="o">=</span> <span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">PROFILE_KEY</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">profile_id</span><span class="p">:</span>
+      <span class="n">profile_id</span> <span class="o">=</span> <span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;@id&quot;</span><span class="p">)</span>
+      <span class="k">if</span> <span class="ow">not</span> <span class="n">profile_id</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">ProfileNotSpecified</span><span class="p">(</span>
+          <span class="p">(</span><span class="s2">&quot;You need to specify the ID of the profile to submit to by using the &#39;</span><span class="si">{}</span><span class="s2">&#39; key&quot;</span>
+           <span class="s2">&quot; in the payload, or by setting the `@id` property explicitely.&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">PROFILE_KEY</span><span class="p">))</span>
+    <span class="n">profile</span> <span class="o">=</span> <span class="n">eup</span><span class="o">.</span><span class="n">Profile</span><span class="p">(</span><span class="n">profile_id</span><span class="p">)</span> <span class="c1">#raises euu.UnknownProfile if unknown profile ID.</span>
+    <span class="k">return</span> <span class="n">profile</span><span class="o">.</span><span class="n">profile_id</span></div>
+
+<div class="viewcode-block" id="Connection.get_lookup_ids_from_payload"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.Connection.get_lookup_ids_from_payload">[docs]</a>  <span class="k">def</span> <span class="nf">get_lookup_ids_from_payload</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">payload</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Given a payload to submit to the Portal, extracts the identifiers that can be used to lookup</span>
+<span class="sd">    the record on the Portal, i.e. to see if the record already exists. Identifiers are extracted</span>
+<span class="sd">    from the following fields:</span>
+
+<span class="sd">    1. ``self.ENCID_KEY``,</span>
+<span class="sd">    2. aliases,</span>
+<span class="sd">    3. md5sum (in the case of a file object)</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        payload: `dict`. The data to submit.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        `list`: The possible lookup identifiers.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">lookup_ids</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ENCID_KEY</span> <span class="ow">in</span> <span class="n">payload</span><span class="p">:</span>
+      <span class="n">lookup_ids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">payload</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">ENCID_KEY</span><span class="p">])</span>
+    <span class="k">if</span> <span class="s2">&quot;aliases&quot;</span> <span class="ow">in</span> <span class="n">payload</span><span class="p">:</span>
+      <span class="n">lookup_ids</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">payload</span><span class="p">[</span><span class="s2">&quot;aliases&quot;</span><span class="p">])</span>
+    <span class="k">if</span> <span class="s2">&quot;md5sum&quot;</span> <span class="ow">in</span> <span class="n">payload</span><span class="p">:</span>
+      <span class="c1">#The case for file objects.</span>
+      <span class="n">lookup_ids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">payload</span><span class="p">[</span><span class="s2">&quot;md5sum&quot;</span><span class="p">])</span>
+
+    <span class="n">lookup_ids</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">lookup_ids</span><span class="p">]</span>
+    <span class="n">lookup_ids</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">lookup_ids</span><span class="p">]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">lookup_ids</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">RecordIdNotPresent</span><span class="p">(</span>
+          <span class="p">(</span><span class="s2">&quot;The payload does not contain a recognized identifier for traceability. For example,&quot;</span>
+           <span class="s2">&quot; you need to set the &#39;aliases&#39; key, or specify an ENCODE assigned identifier in the&quot;</span>
+           <span class="s2">&quot; non-schematic key </span><span class="si">{}</span><span class="s2">.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ENCID_KEY</span><span class="p">)))</span>
+
+    <span class="k">return</span> <span class="n">lookup_ids</span></div>
+
+  <span class="c1">#def delete(self,rec_id):</span>
+  <span class="c1">#  &quot;&quot;&quot;Not supported at present by the DCC - Only wranglers and delete objects.</span>
+  <span class="c1">#  &quot;&quot;&quot;</span>
+  <span class="c1">#  url = os.path.join(self.dcc_url,rec_id)</span>
+  <span class="c1">#  self.logger.info(</span>
+  <span class="c1">#    (&quot;&gt;&gt;&gt;&gt;&gt;&gt;DELETING {rec_id} From DCC with URL {url}&quot;).format(rec_id=rec_id,url=url))</span>
+  <span class="c1">#  response = requests.delete(url,auth=self.auth,timeout=eu.TIMEOUT,headers=euu.REQUEST_HEADERS_JSON, verify=False)</span>
+  <span class="c1">#  pdb.set_trace()</span>
+  <span class="c1">#  if response.ok:</span>
+  <span class="c1">#    return response.json()</span>
+  <span class="c1">#  response.raise_for_status()</span>
+
+<div class="viewcode-block" id="Connection.get"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.Connection.get">[docs]</a>  <span class="k">def</span> <span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">rec_ids</span><span class="p">,</span><span class="n">ignore404</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span><span class="n">frame</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;GET a record from the Portal.</span>
+
+<span class="sd">    Looks up a record in the Portal and performs a GET request, returning the JSON serialization of</span>
+<span class="sd">    the object. You supply a list of identifiers for a specific record, and the Portal will be</span>
+<span class="sd">    searched for each identifier in turn until one is either found or the list is exhaused.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        rec_ids: `str` or `list`. Must be a `list` if you want to supply more than one identifier.</span>
+<span class="sd">            For a few example identifiers, you can use a uuid, accession, ..., or even the value of </span>
+<span class="sd">            a record&#39;s `@id` property.</span>
+<span class="sd">        ignore404: `bool`. Only matters when none of the passed in record IDs were found on the</span>
+<span class="sd">            Portal.  In this case, If set to `True`, then an empty `dict` will be returned.</span>
+<span class="sd">            If set to `False`, then an Exception will be raised.</span>
+
+
+<span class="sd">    Returns:</span>
+<span class="sd">        `dict`: The JSON response. Will be empty if no record was found AND ``ignore404=True``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        requests.exceptions.HTTPError: The status code is not ok, and the</span>
+<span class="sd">            cause isn&#39;t due to a 404 (not found) status code when ``ignore404=True``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">rec_ids</span><span class="p">,</span><span class="nb">str</span><span class="p">):</span>
+      <span class="n">rec_ids</span> <span class="o">=</span> <span class="p">[</span><span class="n">rec_ids</span><span class="p">]</span>
+    <span class="n">status_codes</span> <span class="o">=</span> <span class="p">{}</span> <span class="c1">#key is return code, value is the record ID</span>
+    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">rec_ids</span><span class="p">:</span>
+      <span class="k">if</span> <span class="n">r</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">):</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">r</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)</span>
+      <span class="n">url</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dcc_url</span><span class="p">,</span><span class="n">r</span><span class="p">,</span><span class="s2">&quot;?format=json&amp;datastore=database&quot;</span><span class="p">)</span>
+      <span class="k">if</span> <span class="n">frame</span><span class="p">:</span>
+        <span class="n">url</span> <span class="o">+=</span> <span class="s2">&quot;&amp;frame=</span><span class="si">{frame}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">frame</span><span class="o">=</span><span class="n">frame</span><span class="p">)</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">debug_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;&gt;&gt;&gt;&gt;&gt;&gt;GETTING </span><span class="si">{rec_id}</span><span class="s2"> From DCC with URL </span><span class="si">{url}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+          <span class="n">rec_id</span><span class="o">=</span><span class="n">r</span><span class="p">,</span><span class="n">url</span><span class="o">=</span><span class="n">url</span><span class="p">))</span>
+      <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">,</span>
+                              <span class="n">auth</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">auth</span><span class="p">,</span>
+                              <span class="n">timeout</span><span class="o">=</span><span class="n">eu</span><span class="o">.</span><span class="n">TIMEOUT</span><span class="p">,</span>
+                              <span class="n">headers</span><span class="o">=</span><span class="n">euu</span><span class="o">.</span><span class="n">REQUEST_HEADERS_JSON</span><span class="p">,</span>
+                              <span class="n">verify</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+      <span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+      <span class="n">status_codes</span><span class="p">[</span><span class="n">response</span><span class="o">.</span><span class="n">status_code</span><span class="p">]</span> <span class="o">=</span> <span class="n">r</span>
+
+    <span class="k">if</span> <span class="n">requests</span><span class="o">.</span><span class="n">codes</span><span class="o">.</span><span class="n">FORBIDDEN</span> <span class="ow">in</span> <span class="n">status_codes</span><span class="p">:</span>
+      <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span>
+        <span class="s2">&quot;Access to ENCODE record </span><span class="si">{}</span><span class="s2"> is forbidden&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">status_codes</span><span class="p">[</span><span class="n">requests</span><span class="o">.</span><span class="n">codes</span><span class="o">.</span><span class="n">FORBIDDEN</span><span class="p">]))</span>
+    <span class="k">elif</span> <span class="n">requests</span><span class="o">.</span><span class="n">codes</span><span class="o">.</span><span class="n">NOT_FOUND</span> <span class="ow">in</span> <span class="n">status_codes</span><span class="p">:</span>
+      <span class="k">if</span> <span class="n">ignore404</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{}</span>
+    <span class="c1">#At this point in the code, the response is not okay.</span>
+    <span class="c1"># Raise the error for last response we got:</span>
+    <span class="n">response</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="Connection.set_attachment"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.Connection.set_attachment">[docs]</a>  <span class="k">def</span> <span class="nf">set_attachment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">document</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Sets the `attachment` property for any profile that supports it, such as `document` or </span>
+<span class="sd">    `antibody_characterization`.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        document: `str`. A local file path.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        `dict`. The &#39;attachment&#39; propery value.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">download_filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
+    <span class="n">mime_type</span> <span class="o">=</span> <span class="n">mimetypes</span><span class="o">.</span><span class="n">guess_type</span><span class="p">(</span><span class="n">download_filename</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="n">document</span><span class="p">,</span><span class="s1">&#39;rb&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
+    <span class="n">temp_uri</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">data</span><span class="p">,</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
+    <span class="n">href</span> <span class="o">=</span> <span class="s2">&quot;data:</span><span class="si">{mime_type}</span><span class="s2">;base64,</span><span class="si">{temp_uri}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">mime_type</span><span class="o">=</span><span class="n">mime_type</span><span class="p">,</span><span class="n">temp_uri</span><span class="o">=</span><span class="n">temp_uri</span><span class="p">)</span>
+    <span class="c1">#download_filename = library_alias.split(&quot;:&quot;)[1] + &quot;_relative_knockdown.jpeg&quot;</span>
+    <span class="n">attachment</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">attachment</span><span class="p">[</span><span class="s2">&quot;download&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">download_filename</span>
+    <span class="n">attachment</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">mime_type</span>
+    <span class="n">attachment</span><span class="p">[</span><span class="s2">&quot;href&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">href</span>
+    <span class="k">return</span> <span class="n">attachment</span></div>
+
+<div class="viewcode-block" id="Connection.after_submit_file_cloud_upload"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.Connection.after_submit_file_cloud_upload">[docs]</a>  <span class="k">def</span> <span class="nf">after_submit_file_cloud_upload</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">rec_id</span><span class="p">,</span><span class="n">profile_id</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;An after-POST submit hook for uploading files to AWS.</span>
+
+<span class="sd">    Some objects, such as Files (`file.json` profile) need to have a corresponding file in the cloud.</span>
+<span class="sd">    Where in the cloud the actual file should be uploaded to is indicated in File object&#39;s</span>
+<span class="sd">    `file.upload_credentials.upload_url` property. Once the File object is posted, this hook is  </span>
+<span class="sd">    used to perform the actual cloud upload of the physical, local file represented by the File object.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        rec_id: `str`. An identifier for the new File object on the Portal.</span>
+<span class="sd">        profile_id: `str`. The ID of the profile that the record belongs to.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">profile_id</span> <span class="o">!=</span> <span class="n">eup</span><span class="o">.</span><span class="n">Profile</span><span class="o">.</span><span class="n">FILE_PROFILE_ID</span><span class="p">:</span>
+      <span class="k">return</span>
+    <span class="n">rec</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">rec_ids</span><span class="o">=</span><span class="n">rec_id</span><span class="p">,</span><span class="n">ignore404</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">eup</span><span class="o">.</span><span class="n">Profile</span><span class="o">.</span><span class="n">SUBMITTED_FILE_PROP_NAME</span> <span class="ow">in</span> <span class="n">rec</span><span class="p">:</span>
+      <span class="n">filename</span> <span class="o">=</span> <span class="n">rec</span><span class="p">[</span><span class="n">eup</span><span class="o">.</span><span class="n">Profile</span><span class="o">.</span><span class="n">SUBMITTED_FILE_PROP_NAME</span><span class="p">]</span>
+      <span class="k">if</span> <span class="n">filename</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">upload_file</span><span class="p">(</span><span class="n">file_id</span><span class="o">=</span><span class="n">rec_id</span><span class="p">,</span><span class="n">file_path</span><span class="o">=</span><span class="n">filename</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Connection.after_submit_hooks"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.Connection.after_submit_hooks">[docs]</a>  <span class="k">def</span> <span class="nf">after_submit_hooks</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">rec_id</span><span class="p">,</span><span class="n">profile_id</span><span class="p">,</span><span class="n">method</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calls after-POST and after-PATCH hooks. This method is called from both the ``post()`` and</span>
+<span class="sd">    ``patch()`` instance methods. </span>
+
+<span class="sd">    Some hooks only run if you are doing a PATCH, others if you are only doing a POST. Then there </span>
+<span class="sd">    are some that run if you are doing either operation. Each hook that is called</span>
+<span class="sd">    can potentially modify the payload.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        rec_id: `str`. An identifier for the record on the Portal.</span>
+<span class="sd">        profile_id: `str`. The profile identifier indicating the profile that the record belongs to.</span>
+<span class="sd">        method: str. One of ``self.POST`` or ``self.PATCH``, or the empty string to indicate which </span>
+<span class="sd">            registered hooks to look through.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1">#Check allowed_methods. Will matter later when there are POST-specific</span>
+    <span class="c1"># and PATCH-specific hooks.</span>
+    <span class="n">allowed_methods</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">POST</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">PATCH</span><span class="p">,</span><span class="s2">&quot;&quot;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">method</span> <span class="ow">in</span> <span class="n">allowed_methods</span><span class="p">:</span>
+      <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Unknown method &#39;</span><span class="si">{}</span><span class="s2">&#39;: must be one of </span><span class="si">{}</span><span class="s2">.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">method</span><span class="p">,</span><span class="n">allowed_methods</span><span class="p">))</span>
+
+    <span class="c1">#Call agnostic hooks</span>
+    <span class="c1">#... None yet.</span>
+
+    <span class="c1">#Call POST-specific hooks if POST:</span>
+    <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">POST</span><span class="p">:</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">after_submit_file_cloud_upload</span><span class="p">(</span><span class="n">rec_id</span><span class="p">,</span><span class="n">profile_id</span><span class="p">)</span></div>
+
+    <span class="c1">#Call PATCH-specific hooks if PATCH:</span>
+    <span class="c1">#... None yet.</span>
+
+<div class="viewcode-block" id="Connection.before_submit_alias"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.Connection.before_submit_alias">[docs]</a>  <span class="k">def</span> <span class="nf">before_submit_alias</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">payload</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A pre-POST and pre-PATCH hook used to add the lab alias prefix to any aliases that are </span>
+<span class="sd">    missing it. The `DCC_LAB` environment variable is consulted to fetch the lab name, and if not</span>
+<span class="sd">    set then this will be a no-op. </span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        payload: `dict`. The payload to submit to the Portal.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        `dict`: The potentially modified payload.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">aliases_prop</span> <span class="o">=</span> <span class="s2">&quot;aliases&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">aliases_prop</span> <span class="ow">in</span> <span class="n">payload</span><span class="p">:</span>
+      <span class="k">return</span> <span class="n">payload</span>
+    <span class="n">payload</span><span class="p">[</span><span class="n">aliases_prop</span><span class="p">]</span> <span class="o">=</span> <span class="n">euu</span><span class="o">.</span><span class="n">add_alias_prefix</span><span class="p">(</span><span class="n">payload</span><span class="p">[</span><span class="n">aliases_prop</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">payload</span></div>
+    
+
+<div class="viewcode-block" id="Connection.before_submit_attachment"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.Connection.before_submit_attachment">[docs]</a>  <span class="k">def</span> <span class="nf">before_submit_attachment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">payload</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A pre-POST and pre-PATCH hook used to simplify the creation of an attachment in profiles </span>
+<span class="sd">    that support it.</span>
+
+<span class="sd">    Checks the payload for the presence of the `attachment` property that is used by certain </span>
+<span class="sd">    profiles, i.e. `document` and `antibody_characterization`, and then checks to see if a particular</span>
+<span class="sd">    shortcut is being employed to indicate the attachment. That shortcut works as follows: if the </span>
+<span class="sd">    dictionary value of the &#39;attachment&#39; key has a key named &#39;path&#39; in it (case-sensitive), then </span>
+<span class="sd">    the value is taken to be the path to a local file. Then, the actual attachment object is </span>
+<span class="sd">    constructed, as defined in the `document` profile, by calling ``self.set_attachment()``.  Note that </span>
+<span class="sd">    this shortcut is particular to this ``Connection`` class, and when used the &#39;path&#39; key should be </span>
+<span class="sd">    the only key in the attachment dictionary as any others will be ignored.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        payload: `dict`. The payload to submit to the Portal.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        `dict`: The potentially modified payload.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">attachment_prop</span> <span class="o">=</span> <span class="s2">&quot;attachment&quot;</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="s2">&quot;path&quot;</span>
+
+    <span class="k">if</span> <span class="n">attachment_prop</span> <span class="ow">in</span> <span class="n">payload</span><span class="p">:</span>
+      <span class="n">val</span> <span class="o">=</span> <span class="n">payload</span><span class="p">[</span><span class="n">attachment_prop</span><span class="p">]</span> <span class="c1">#dict</span>
+      <span class="k">if</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">val</span><span class="p">:</span>
+        <span class="c1">#Then set the actual attachment object:</span>
+        <span class="n">attachment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">set_attachment</span><span class="p">(</span><span class="n">document</span><span class="o">=</span><span class="n">val</span><span class="p">[</span><span class="n">path</span><span class="p">])</span>
+        <span class="n">payload</span><span class="p">[</span><span class="n">attachment_prop</span><span class="p">]</span> <span class="o">=</span> <span class="n">attachment</span>
+    <span class="k">return</span> <span class="n">payload</span></div>
+
+<div class="viewcode-block" id="Connection.before_post_file"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.Connection.before_post_file">[docs]</a>  <span class="k">def</span> <span class="nf">before_post_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">payload</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;A pre-POST hook that calculates and sets the `md5sum` property for a file record.    </span>
+
+<span class="sd">    If the &#39;md5sum&#39; key is already present in the payload, then this is a no-op.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        payload: `dict`. The payload to submit to the Portal.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        `dict`: The potentially modified payload.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        encode_utils.utils.MD5SumError: Perculated through the function </span>
+<span class="sd">          `encode_utils.utils.calculate_md5sum` when it can&#39;t calculate the md5sum.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">profile_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_profile_from_payload</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">profile_id</span> <span class="o">!=</span> <span class="n">eup</span><span class="o">.</span><span class="n">Profile</span><span class="o">.</span><span class="n">FILE_PROFILE_ID</span><span class="p">:</span>
+      <span class="k">return</span> <span class="n">payload</span>
+    <span class="k">try</span><span class="p">:</span>
+      <span class="n">file_name</span> <span class="o">=</span> <span class="n">payload</span><span class="p">[</span><span class="n">eup</span><span class="o">.</span><span class="n">Profile</span><span class="o">.</span><span class="n">SUBMITTED_FILE_PROP_NAME</span><span class="p">]</span>
+    <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+      <span class="k">return</span> <span class="n">payload</span>
+    <span class="k">if</span> <span class="n">eup</span><span class="o">.</span><span class="n">Profile</span><span class="o">.</span><span class="n">MD5SUM_NAME_PROP_NAME</span> <span class="ow">in</span> <span class="n">payload</span><span class="p">:</span>
+      <span class="k">if</span> <span class="n">payload</span><span class="p">[</span><span class="n">eup</span><span class="o">.</span><span class="n">Profile</span><span class="o">.</span><span class="n">MD5SUM_NAME_PROP_NAME</span><span class="p">]:</span>
+        <span class="c1">#Already set; nothing to do.</span>
+        <span class="k">return</span> <span class="n">payload</span>
+    <span class="n">md5sum</span> <span class="o">=</span> <span class="n">euu</span><span class="o">.</span><span class="n">calculate_md5sum</span><span class="p">(</span><span class="n">file_name</span><span class="p">)</span>
+    <span class="n">payload</span><span class="p">[</span><span class="s2">&quot;md5sum&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">md5sum</span>
+    <span class="k">return</span> <span class="n">payload</span></div>
+
+
+<div class="viewcode-block" id="Connection.before_submit_hooks"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.Connection.before_submit_hooks">[docs]</a>  <span class="k">def</span> <span class="nf">before_submit_hooks</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">payload</span><span class="p">,</span><span class="n">method</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Calls pre-POST and pre-PATCH hooks. This method is called from both the ``post()`` and</span>
+<span class="sd">    ``patch()`` instance methods.</span>
+
+<span class="sd">    Some hooks only run if you are doing a PATCH, others if you are only doing a POST. Then there</span>
+<span class="sd">    are some that run if you are doing either operation. Each hook that is called</span>
+<span class="sd">    can potentially modify the payload.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        payload: `dict`. The payload to POST or PATCH.</span>
+<span class="sd">        method: `str`. One of &quot;post&quot; or &quot;patch&quot;, or the empty string to indicate which registered</span>
+<span class="sd">            hooks to look through.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        `dict`: The potentially modified payload that has been passed through all applicable</span>
+<span class="sd">        pre-submit hooks.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1">#Check allowed_methods. Will matter later when there are POST-specific</span>
+    <span class="c1"># and PATCH-specific hooks.</span>
+    <span class="n">allowed_methods</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">POST</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">PATCH</span><span class="p">,</span><span class="s2">&quot;&quot;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">method</span> <span class="ow">in</span> <span class="n">allowed_methods</span><span class="p">:</span>
+      <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Unknown method &#39;</span><span class="si">{}</span><span class="s2">&#39;: must be one of </span><span class="si">{}</span><span class="s2">.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">method</span><span class="p">,</span><span class="n">allowed_methods</span><span class="p">))</span>
+
+    <span class="c1">#Call agnostic hooks</span>
+    <span class="n">payload</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">before_submit_attachment</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+    <span class="n">payload</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">before_submit_alias</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+
+    <span class="c1">#Call POST-specific hooks if POST:</span>
+    <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">POST</span><span class="p">:</span>
+      <span class="n">payload</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">before_post_file</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+
+    <span class="c1">#Call PATCH-specific hooks if PATCH:</span>
+    <span class="c1">#... None yet.</span>
+
+    <span class="k">return</span> <span class="n">payload</span></div>
+
+
+<div class="viewcode-block" id="Connection.post"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.Connection.post">[docs]</a>  <span class="k">def</span> <span class="nf">post</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">payload</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;POST a record to the Portal.</span>
+
+<span class="sd">    Requires that you include in the payload the non-schematic key ``self.PROFILE_KEY`` to</span>
+<span class="sd">    designate the name of the ENCODE object profile that you are submitting to, or the </span>
+<span class="sd">    actual `@id` property itself.</span>
+
+<span class="sd">    If the `lab` property isn&#39;t present in the payload, then the default will be set to the value</span>
+<span class="sd">    of the `DCC_LAB` environment variable. Similarly, if the `award` property isn&#39;t present, then the</span>
+<span class="sd">    default will be set to the value of the `DCC_AWARD` environment variable.</span>
+
+<span class="sd">    Before the POST is attempted, any pre-POST hooks are fist called (see the method</span>
+<span class="sd">    ``self.before_submit_hooks``).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        payload: `dict`. The data to submit.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        `dict`: The JSON response from the POST operation, or GET operation If the resource already</span>
+<span class="sd">        exist on the Portal.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        encode_utils.connection.AwardPropertyMissing: The `award` property isn&#39;t present in the payload and there isn&#39;t a</span>
+<span class="sd">            defualt set by the environment variable `DCC_AWARD`.</span>
+<span class="sd">        encode_utils.connection.LabPropertyMissing: The `lab` property isn&#39;t present in the payload and there isn&#39;t a</span>
+<span class="sd">            default set by the environment variable `DCC_LAB`.</span>
+<span class="sd">        encode_utils.connection.requests.exceptions.HTTPError: The return status is not ok, with</span>
+<span class="sd">            the exception of a conflict (409) which is only logged.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">debug_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">IN post().&quot;</span><span class="p">)</span>
+    <span class="c1">#Make sure we have a payload that can be converted to valid JSON, and tuples become arrays, ...</span>
+    <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">payload</span><span class="p">))</span>
+    <span class="n">profile_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_profile_from_payload</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+    <span class="n">url</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dcc_url</span><span class="p">,</span><span class="n">profile_id</span><span class="p">)</span>
+    <span class="c1">#Check if we need to add defaults for &#39;award&#39; and &#39;lab&#39; properties:</span>
+    <span class="k">if</span> <span class="n">profile_id</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">eup</span><span class="o">.</span><span class="n">Profile</span><span class="o">.</span><span class="n">AWARDLESS_PROFILE_IDS</span><span class="p">:</span> <span class="c1">#No lab prop for these profiles either.</span>
+      <span class="k">if</span> <span class="n">eu</span><span class="o">.</span><span class="n">AWARD_PROP_NAME</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">payload</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">eu</span><span class="o">.</span><span class="n">AWARD</span><span class="p">:</span>
+          <span class="k">raise</span> <span class="n">AwardPropertyMissing</span>
+        <span class="n">payload</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">eu</span><span class="o">.</span><span class="n">AWARD</span><span class="p">)</span>
+      <span class="k">if</span> <span class="n">eu</span><span class="o">.</span><span class="n">LAB_PROP_NAME</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">payload</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">eu</span><span class="o">.</span><span class="n">LAB</span><span class="p">:</span>
+          <span class="k">raise</span> <span class="n">LabPropertyMissing</span>
+        <span class="n">payload</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">eu</span><span class="o">.</span><span class="n">LAB</span><span class="p">)</span>
+    <span class="n">alias</span> <span class="o">=</span> <span class="n">payload</span><span class="p">[</span><span class="s2">&quot;aliases&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="c1">#Run &#39;before&#39; hooks:</span>
+    <span class="n">payload</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">before_submit_hooks</span><span class="p">(</span><span class="n">payload</span><span class="p">,</span><span class="n">method</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">POST</span><span class="p">)</span>
+    <span class="c1">#Remove the non-schematic self.PROFILE_KEY if being used. Also check for the `@id` property</span>
+    <span class="c1"># and remove if found too.</span>
+    <span class="k">try</span><span class="p">:</span>
+      <span class="n">payload</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">PROFILE_KEY</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+      <span class="k">pass</span>
+    <span class="k">try</span><span class="p">:</span>
+      <span class="n">payload</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;@id&quot;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+      <span class="k">pass</span>
+
+    <span class="bp">self</span><span class="o">.</span><span class="n">debug_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+        <span class="p">(</span><span class="s2">&quot;&lt;&lt;&lt;&lt;&lt;&lt; POSTING </span><span class="si">{alias}</span><span class="s2"> To DCC with URL </span><span class="si">{url}</span><span class="s2"> and this&quot;</span>
+         <span class="s2">&quot; payload:</span><span class="se">\n\n</span><span class="si">{payload}</span><span class="se">\n\n</span><span class="s2">&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">alias</span><span class="o">=</span><span class="n">alias</span><span class="p">,</span><span class="n">url</span><span class="o">=</span><span class="n">url</span><span class="p">,</span><span class="n">payload</span><span class="o">=</span><span class="n">euu</span><span class="o">.</span><span class="n">print_format_dict</span><span class="p">(</span><span class="n">payload</span><span class="p">)))</span>
+
+    <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="n">url</span><span class="p">,</span>
+                             <span class="n">auth</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">auth</span><span class="p">,</span>
+                             <span class="n">timeout</span><span class="o">=</span><span class="n">eu</span><span class="o">.</span><span class="n">TIMEOUT</span><span class="p">,</span>
+                             <span class="n">headers</span><span class="o">=</span><span class="n">euu</span><span class="o">.</span><span class="n">REQUEST_HEADERS_JSON</span><span class="p">,</span>
+                             <span class="n">json</span><span class="o">=</span><span class="n">payload</span><span class="p">,</span> <span class="n">verify</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="c1">#response_json = response.json()[&quot;@graph&quot;][0]</span>
+    <span class="n">response_json</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">debug_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Success.&quot;</span><span class="p">)</span>
+      <span class="n">response_json</span> <span class="o">=</span> <span class="n">response_json</span><span class="p">[</span><span class="s2">&quot;@graph&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+      <span class="n">encid</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+      <span class="k">try</span><span class="p">:</span>
+        <span class="n">encid</span> <span class="o">=</span> <span class="n">response_json</span><span class="p">[</span><span class="s2">&quot;accession&quot;</span><span class="p">]</span>
+      <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+        <span class="c1">#Some objects don&#39;t have an accession, i.e. replicates.</span>
+        <span class="n">encid</span> <span class="o">=</span> <span class="n">response_json</span><span class="p">[</span><span class="s2">&quot;uuid&quot;</span><span class="p">]</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">_log_post</span><span class="p">(</span><span class="n">alias</span><span class="o">=</span><span class="n">alias</span><span class="p">,</span><span class="n">dcc_id</span><span class="o">=</span><span class="n">encid</span><span class="p">)</span>
+      <span class="c1">#Run &#39;after&#39; hooks:</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">after_submit_hooks</span><span class="p">(</span><span class="n">encid</span><span class="p">,</span><span class="n">profile_id</span><span class="p">,</span><span class="n">method</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">POST</span><span class="p">)</span>
+      <span class="k">return</span> <span class="n">response_json</span>
+    <span class="k">elif</span> <span class="n">response</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="n">requests</span><span class="o">.</span><span class="n">codes</span><span class="o">.</span><span class="n">CONFLICT</span><span class="p">:</span>
+      <span class="n">log_msg</span> <span class="o">=</span> <span class="s2">&quot;Will not post </span><span class="si">{}</span><span class="s2"> because it already exists.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">alias</span><span class="p">)</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">log_error</span><span class="p">(</span><span class="n">log_msg</span><span class="p">)</span>
+      <span class="n">rec_json</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">rec_ids</span><span class="o">=</span><span class="n">alias</span><span class="p">,</span><span class="n">ignore404</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+      <span class="k">return</span> <span class="n">rec_json</span>
+    <span class="k">else</span><span class="p">:</span>
+      <span class="n">message</span> <span class="o">=</span> <span class="s2">&quot;Failed to POST </span><span class="si">{alias}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">alias</span><span class="o">=</span><span class="n">alias</span><span class="p">)</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">log_error</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">debug_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;&lt;&lt;&lt;&lt;&lt;&lt; DCC POST RESPONSE: &quot;</span><span class="p">)</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">debug_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">euu</span><span class="o">.</span><span class="n">print_format_dict</span><span class="p">(</span><span class="n">response_json</span><span class="p">))</span>
+      <span class="n">response</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="Connection.patch"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.Connection.patch">[docs]</a>  <span class="k">def</span> <span class="nf">patch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">payload</span><span class="p">,</span><span class="n">raise_403</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">extend_array_values</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;PATCH a record on the Portal.</span>
+
+<span class="sd">    Before the PATCH is attempted, any pre-PATCH hooks are fist called (see the method</span>
+<span class="sd">    ``self.before_submit_hooks()``).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        payload: `dict`. containing the attribute key and value pairs to patch. Must contain the key</span>
+<span class="sd">            ``self.ENCID_KEY`` in order to indicate which record to PATCH.</span>
+<span class="sd">        raise_403: `bool`. `True` means to raise a ``requests.exceptions.HTTPError`` if a 403 status</span>
+<span class="sd">            (forbidden) is returned.</span>
+<span class="sd">            If set to `False` and there still is a 403 return status, then the object you were</span>
+<span class="sd">            trying to PATCH will be fetched from the Portal in JSON format as this function&#39;s</span>
+<span class="sd">            return value.</span>
+<span class="sd">        extend_array_values: `bool`. Only affects keys with array values. `True` (default) means to</span>
+<span class="sd">            extend the corresponding value on the Portal with what&#39;s specified in the payload.</span>
+<span class="sd">            `False` means to replace the value on the Portal with what&#39;s in the payload.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        `dict`: The JSON response from the PATCH operation.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        KeyError: The payload doesn&#39;t have the key ``self.ENCID_KEY`` set AND there aren&#39;t</span>
+<span class="sd">            any aliases provided in the payload&#39;s &#39;aliases&#39; key.</span>
+<span class="sd">        requests.exceptions.HTTPError: if the return status is not ok (excluding a</span>
+<span class="sd">            403 status if &#39;raise_403&#39; is False.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1">#Make sure we have a payload that can be converted to valid JSON, and tuples become arrays, ...</span>
+    <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">payload</span><span class="p">))</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">debug_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">IN patch()&quot;</span><span class="p">)</span>
+    <span class="n">encode_id</span> <span class="o">=</span> <span class="n">payload</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">ENCID_KEY</span><span class="p">]</span>
+    <span class="n">rec_json</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">rec_ids</span><span class="o">=</span><span class="n">encode_id</span><span class="p">,</span><span class="n">ignore404</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">extend_array_values</span><span class="p">:</span>
+      <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">payload</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">payload</span><span class="p">[</span><span class="n">key</span><span class="p">],</span><span class="nb">list</span><span class="p">):</span>
+          <span class="n">val</span> <span class="o">=</span> <span class="n">payload</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+          <span class="n">val</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">rec_json</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">,[]))</span>
+          <span class="c1">#I use rec_json.get(key,[]) above because in a GET request,</span>
+          <span class="c1"># not all props are pulled back when they are empty.</span>
+          <span class="c1"># For ex, in a file object, if the controlled_by prop isn&#39;t set, then</span>
+          <span class="c1"># it won&#39;t be in the response.</span>
+          <span class="n">payload</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">val</span><span class="p">))</span>
+
+    <span class="c1">#Run &#39;before&#39; hooks:</span>
+    <span class="n">payload</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">before_submit_hooks</span><span class="p">(</span><span class="n">payload</span><span class="p">,</span><span class="n">method</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">PATCH</span><span class="p">)</span>
+    <span class="n">payload</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ENCID_KEY</span><span class="p">)</span>
+
+    <span class="n">url</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dcc_url</span><span class="p">,</span><span class="n">encode_id</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">debug_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+        <span class="p">(</span><span class="s2">&quot;&lt;&lt;&lt;&lt;&lt;&lt; PATCHING </span><span class="si">{encode_id}</span><span class="s2"> To DCC with URL&quot;</span>
+         <span class="s2">&quot; </span><span class="si">{url}</span><span class="s2"> and this payload:</span><span class="se">\n\n</span><span class="si">{payload}</span><span class="se">\n\n</span><span class="s2">&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+             <span class="n">encode_id</span><span class="o">=</span><span class="n">encode_id</span><span class="p">,</span><span class="n">url</span><span class="o">=</span><span class="n">url</span><span class="p">,</span><span class="n">payload</span><span class="o">=</span><span class="n">euu</span><span class="o">.</span><span class="n">print_format_dict</span><span class="p">(</span><span class="n">payload</span><span class="p">)))</span>
+
+    <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">patch</span><span class="p">(</span><span class="n">url</span><span class="p">,</span><span class="n">auth</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">auth</span><span class="p">,</span><span class="n">timeout</span><span class="o">=</span><span class="n">eu</span><span class="o">.</span><span class="n">TIMEOUT</span><span class="p">,</span><span class="n">headers</span><span class="o">=</span><span class="n">euu</span><span class="o">.</span><span class="n">REQUEST_HEADERS_JSON</span><span class="p">,</span>
+                              <span class="n">json</span><span class="o">=</span><span class="n">payload</span><span class="p">,</span><span class="n">verify</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">response_json</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">debug_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Success.&quot;</span><span class="p">)</span>
+      <span class="n">response_json</span> <span class="o">=</span> <span class="n">response_json</span><span class="p">[</span><span class="s2">&quot;@graph&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+      <span class="n">uuid</span> <span class="o">=</span> <span class="n">response_json</span><span class="p">[</span><span class="s2">&quot;uuid&quot;</span><span class="p">]</span>
+      <span class="n">profile</span> <span class="o">=</span> <span class="n">eup</span><span class="o">.</span><span class="n">Profile</span><span class="p">(</span><span class="n">response_json</span><span class="p">[</span><span class="s2">&quot;@id&quot;</span><span class="p">])</span>
+      <span class="c1">#Run &#39;after&#39; hooks:</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">after_submit_hooks</span><span class="p">(</span><span class="n">uuid</span><span class="p">,</span><span class="n">profile</span><span class="o">.</span><span class="n">profile_id</span><span class="p">,</span><span class="n">method</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">PATCH</span><span class="p">)</span>
+      <span class="k">return</span> <span class="n">response_json</span>
+    <span class="k">elif</span> <span class="n">response</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="n">requests</span><span class="o">.</span><span class="n">codes</span><span class="o">.</span><span class="n">FORBIDDEN</span><span class="p">:</span>
+      <span class="c1">#Don&#39;t have permission to PATCH this object.</span>
+      <span class="k">if</span> <span class="ow">not</span> <span class="n">raise_403</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">rec_json</span>
+
+    <span class="n">message</span> <span class="o">=</span> <span class="s2">&quot;Failed to PATCH </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">encode_id</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">log_error</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">debug_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;&lt;&lt;&lt;&lt;&lt;&lt; DCC PATCH RESPONSE: &quot;</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">debug_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">euu</span><span class="o">.</span><span class="n">print_format_dict</span><span class="p">(</span><span class="n">response_json</span><span class="p">))</span>
+    <span class="n">response</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Connection.send"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.Connection.send">[docs]</a>  <span class="k">def</span> <span class="nf">send</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">payload</span><span class="p">,</span><span class="n">error_if_not_found</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">extend_array_values</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span><span class="n">raise_403</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A wrapper over ``self.post()`` and ``self.patch()`` that determines which to call based on whether the</span>
+<span class="sd">    record exists on the Portal.  Especially useful when submitting a high-level object,</span>
+<span class="sd">    such as an experiment which contains many dependent objects, in which case you could have a mix</span>
+<span class="sd">    where some need to be POST&#39;d and some PATCH&#39;d.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        payload: `dict`. The data to submit.</span>
+<span class="sd">        error_if_not_found: `bool`. If set to `True`, then a PATCH will be attempted and a</span>
+<span class="sd">            ``requests.exceptions.HTTPError`` will be raised if the record doesn&#39;t exist on the Portal.</span>
+<span class="sd">        extend_array_values: `bool`. Only matters when doing a PATCH, and Only affects keys with</span>
+<span class="sd">            array values. `True` (default) means to extend the corresponding value on the Portal</span>
+<span class="sd">            with what&#39;s specified in the payload. `False` means to replace the value on the Portal</span>
+<span class="sd">            with what&#39;s in the payload.</span>
+<span class="sd">        raise_403: `bool`. Only matters when doing a PATCH. `True` means to raise an</span>
+<span class="sd">            requests.exceptions.HTTPError if a 403 status (forbidden) is returned.</span>
+<span class="sd">            If set to `False` and there still is a 403 return status, then the object you were</span>
+<span class="sd">            trying to PATCH will be fetched from the Portal in JSON format as this function&#39;s</span>
+<span class="sd">            return value (as handled by ``self.patch()``).</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">          requests.exceptions.HTTPError: You want to do a PATCH (indicated by setting</span>
+<span class="sd">              ``error_if_not_found=True``) but the record isn&#39;t found.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1">#Check wither record already exists on the portal</span>
+    <span class="n">lookup_ids</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_lookup_ids_from_payload</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+    <span class="n">rec_json</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">rec_ids</span><span class="o">=</span><span class="n">lookup_ids</span><span class="p">,</span><span class="n">ignore404</span><span class="o">=</span><span class="ow">not</span> <span class="n">error_if_not_found</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">rec_json</span><span class="p">:</span>
+      <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="n">payload</span><span class="o">=</span><span class="n">payload</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+      <span class="c1">#PATCH</span>
+      <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ENCID_KEY</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">payload</span><span class="p">:</span>
+        <span class="n">encode_id</span> <span class="o">=</span> <span class="n">aliases</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">payload</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">ENCID_KEY</span><span class="p">]</span> <span class="o">=</span> <span class="n">encode_id</span>
+      <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">patch</span><span class="p">(</span><span class="n">payload</span><span class="o">=</span><span class="n">payload</span><span class="p">,</span><span class="n">extend_array_values</span><span class="o">=</span><span class="n">extend_array_values</span><span class="p">,</span><span class="n">raise_403</span><span class="o">=</span><span class="n">raise_403</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Connection.get_fastqfile_replicate_hash"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.Connection.get_fastqfile_replicate_hash">[docs]</a>  <span class="k">def</span> <span class="nf">get_fastqfile_replicate_hash</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">dcc_exp_id</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Given a DCC experiment ID, gets its JSON representation from the Portal and looks in the </span>
+<span class="sd">    `original` property to find FASTQ file objects and creates a `dict` organized by replicate </span>
+<span class="sd">    numbers. Keying through the `dict` by replicate numbers, you can get to a particular file </span>
+<span class="sd">    object&#39;s JSON serialization.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        dcc_exp_id: `list` of DCC file IDs or aliases</span>
+<span class="sd">    Returns:</span>
+<span class="sd">        `dict`: `dict` where each key is a biological_replicate_number.</span>
+<span class="sd">        The value of each key is another `dict` where each key is a technical_replicate_number.</span>
+<span class="sd">        The value of this is yet another `dict` with keys being file read numbers -</span>
+<span class="sd">        1 for forward reads, 2 for reverse reads.  The value</span>
+<span class="sd">        for a given key of this most inner dictionary is a list of JSON-serialized file objects.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">exp_json</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ignore404</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">rec_ids</span><span class="o">=</span><span class="n">dcc_exp_id</span><span class="p">)</span>
+    <span class="n">dcc_file_ids</span> <span class="o">=</span> <span class="n">exp_json</span><span class="p">[</span><span class="s2">&quot;original_files&quot;</span><span class="p">]</span>
+    <span class="n">dico</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">dcc_file_ids</span><span class="p">:</span>
+      <span class="n">file_json</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ignore404</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">rec_ids</span><span class="o">=</span><span class="n">i</span><span class="p">)</span>
+      <span class="k">if</span> <span class="n">file_json</span><span class="p">[</span><span class="s2">&quot;file_type&quot;</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">&quot;fastq&quot;</span><span class="p">:</span>
+        <span class="k">continue</span> <span class="c1">#this is not a file object for a FASTQ file.</span>
+      <span class="n">brn</span> <span class="o">=</span> <span class="n">file_json</span><span class="p">[</span><span class="s2">&quot;replicate&quot;</span><span class="p">][</span><span class="s2">&quot;biological_replicate_number&quot;</span><span class="p">]</span>
+      <span class="n">trn</span> <span class="o">=</span> <span class="n">file_json</span><span class="p">[</span><span class="s2">&quot;replicate&quot;</span><span class="p">][</span><span class="s2">&quot;technical_replicate_number&quot;</span><span class="p">]</span>
+      <span class="n">read_num</span> <span class="o">=</span> <span class="n">file_json</span><span class="p">[</span><span class="s2">&quot;paired_end&quot;</span><span class="p">]</span> <span class="c1">#string</span>
+      <span class="k">if</span> <span class="n">brn</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">dico</span><span class="p">:</span>
+        <span class="n">dico</span><span class="p">[</span><span class="n">brn</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+      <span class="k">if</span> <span class="n">trn</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">dico</span><span class="p">[</span><span class="n">brn</span><span class="p">]:</span>
+        <span class="n">dico</span><span class="p">[</span><span class="n">brn</span><span class="p">][</span><span class="n">trn</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+      <span class="k">if</span> <span class="n">read_num</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">dico</span><span class="p">[</span><span class="n">brn</span><span class="p">][</span><span class="n">trn</span><span class="p">]:</span>
+        <span class="n">dico</span><span class="p">[</span><span class="n">brn</span><span class="p">][</span><span class="n">trn</span><span class="p">][</span><span class="n">read_num</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+      <span class="n">dico</span><span class="p">[</span><span class="n">brn</span><span class="p">][</span><span class="n">trn</span><span class="p">][</span><span class="n">read_num</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">file_json</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">dico</span></div>
+
+<div class="viewcode-block" id="Connection.extract_aws_upload_credentials"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.Connection.extract_aws_upload_credentials">[docs]</a>  <span class="k">def</span> <span class="nf">extract_aws_upload_credentials</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">file_json</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Sets values for the AWS CLI security credentials (for uploading a file to AWS S3) to the </span>
+<span class="sd">    credentials found in a file record&#39;s `upload_credentials` property. The security credentials</span>
+<span class="sd">    are stored in a `dict` where the keys are named after environment variables to be used by</span>
+<span class="sd">    the AWS CLI.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        file_json: `dict`: A file record&#39;s JSON serialization.</span>
+<span class="sd"> </span>
+<span class="sd">    Returns:</span>
+<span class="sd">        `dict`: `dict` containing keys named after AWS CLI environment variables being:</span>
+
+<span class="sd">          1. AWS_ACCESS_KEY_ID,</span>
+<span class="sd">          2. AWS_SECRET_ACCESS_KEY,</span>
+<span class="sd">          3. AWS_SECURITY_TOKEN,</span>
+<span class="sd">          4. UPLOAD_URL</span>
+
+<span class="sd">        Will be empty if the `upload_credentials` property isn&#39;t present in `file_json`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+      <span class="n">creds</span> <span class="o">=</span> <span class="n">file_json</span><span class="p">[</span><span class="s2">&quot;upload_credentials&quot;</span><span class="p">]</span>
+    <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+      <span class="k">return</span> <span class="p">{}</span>
+    <span class="n">aws_creds</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">aws_creds</span><span class="p">[</span><span class="s2">&quot;AWS_ACCESS_KEY_ID&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">creds</span><span class="p">[</span><span class="s2">&quot;access_key&quot;</span><span class="p">]</span>
+    <span class="n">aws_creds</span><span class="p">[</span><span class="s2">&quot;AWS_SECRET_ACCESS_KEY&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">creds</span><span class="p">[</span><span class="s2">&quot;secret_key&quot;</span><span class="p">]</span>
+    <span class="n">aws_creds</span><span class="p">[</span><span class="s2">&quot;AWS_SECURITY_TOKEN&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">creds</span><span class="p">[</span><span class="s2">&quot;session_token&quot;</span><span class="p">]</span>
+    <span class="n">aws_creds</span><span class="p">[</span><span class="s2">&quot;UPLOAD_URL&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">creds</span><span class="p">[</span><span class="s2">&quot;upload_url&quot;</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">aws_creds</span></div>
+
+<div class="viewcode-block" id="Connection.set_aws_upload_config"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.Connection.set_aws_upload_config">[docs]</a>  <span class="k">def</span> <span class="nf">set_aws_upload_config</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">file_id</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Similar to ``self.extract_aws_upload_credentials()``, but it goes a step further in that it is</span>
+<span class="sd">    capable of regenerating the upload credentials if they aren&#39;t currently present in the file </span>
+<span class="sd">    record.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        file_id: `str`. A file object identifier (i.e. accession, uuid, alias, md5sum).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        `dict`: See documentation for the return value for </span>
+<span class="sd">        ``self.extract_aws_upload_credentials()``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">file_json</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">file_id</span><span class="p">,</span><span class="n">ignore404</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">creds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">extract_aws_upload_credentials</span><span class="p">(</span><span class="n">file_json</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">creds</span><span class="p">:</span>
+      <span class="n">creds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">regenerate_aws_upload_creds</span><span class="p">(</span><span class="n">file_id</span><span class="p">)</span>
+      <span class="c1">#Will be None if forbidden.</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">creds</span><span class="p">:</span>
+      <span class="k">return</span> <span class="p">{}</span>
+
+    <span class="c1">#URL example from dev Portal:</span>
+    <span class="c1">#  s3://encoded-files-dev/2018/01/28/7c5c6d58-c98a-48b4-9d4b-3296b4126b89/TSTFF334203.fastq.gz&quot;</span>
+    <span class="c1">#  That&#39;s the uuid after the date.</span>
+    <span class="k">return</span> <span class="n">creds</span></div>
+
+<div class="viewcode-block" id="Connection.regenerate_aws_upload_creds"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.Connection.regenerate_aws_upload_creds">[docs]</a>  <span class="k">def</span> <span class="nf">regenerate_aws_upload_creds</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">file_id</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Reissues AWS S3 upload credentials for the specified file record.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        file_id: `str`. An identifier for a file record on the Portal.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        `dict`: `dict` containing the value of the &#39;upload_credentials&#39; key in the JSON serialization</span>
+<span class="sd">        of the file record represented by `file_id`. Will be empty if new upload credentials</span>
+<span class="sd">        could not be issued.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">debug_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Using curl to generate new file upload credentials&quot;</span><span class="p">)</span>
+    <span class="n">cmd</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;curl -X POST -H &#39;Accept: application/json&#39; -H &#39;Content-Type: application/json&#39;&quot;</span>
+           <span class="s2">&quot; https://</span><span class="si">{api_key}</span><span class="s2">:</span><span class="si">{secret_key}</span><span class="s2">@</span><span class="si">{host}</span><span class="s2">/files/</span><span class="si">{file_id}</span><span class="s2">/upload -d &#39;{{}}&#39;&quot;</span>
+           <span class="s2">&quot; | python -m json.tool&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">api_key</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">api_key</span><span class="p">,</span><span class="n">secret_key</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">secret_key</span><span class="p">,</span><span class="n">host</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dcc_host</span><span class="p">,</span><span class="n">file_id</span><span class="o">=</span><span class="n">file_id</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">debug_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;curl command: &#39;</span><span class="si">{}</span><span class="s2">&#39;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">cmd</span><span class="p">))</span>
+    <span class="n">popen</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span><span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span><span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">)</span>
+    <span class="n">stdout</span><span class="p">,</span><span class="n">stderr</span> <span class="o">=</span> <span class="n">popen</span><span class="o">.</span><span class="n">communicate</span><span class="p">()</span> <span class="c1">#each is a bytes object.</span>
+    <span class="n">stdout</span> <span class="o">=</span> <span class="n">stdout</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
+    <span class="n">stderr</span> <span class="o">=</span> <span class="n">stderr</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
+    <span class="n">retcode</span> <span class="o">=</span> <span class="n">popen</span><span class="o">.</span><span class="n">returncode</span>
+    <span class="k">if</span> <span class="n">retcode</span><span class="p">:</span>
+      <span class="k">raise</span> <span class="ne">Exception</span><span class="p">((</span><span class="s2">&quot;Command </span><span class="si">{cmd}</span><span class="s2"> failed with return code </span><span class="si">{retcode}</span><span class="s2">. stdout is </span><span class="si">{stdout}</span><span class="s2"> and&quot;</span>
+                       <span class="s2">&quot; stderr is </span><span class="si">{stderr}</span><span class="s2">.&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">cmd</span><span class="o">=</span><span class="n">cmd</span><span class="p">,</span><span class="n">retcode</span><span class="o">=</span><span class="n">retcode</span><span class="p">,</span><span class="n">stdout</span><span class="o">=</span><span class="n">stdout</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="n">stderr</span><span class="p">))</span>
+    <span class="n">response</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">stdout</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">debug_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">&quot;code&quot;</span> <span class="ow">in</span> <span class="n">response</span><span class="p">:</span>
+      <span class="c1">#Then problem occurred.</span>
+      <span class="n">code</span> <span class="o">=</span> <span class="n">response</span><span class="p">[</span><span class="s2">&quot;code&quot;</span><span class="p">]</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">log_error</span><span class="p">(</span><span class="s2">&quot;Unable to reissue upload credentials for </span><span class="si">{}</span><span class="s2">: Code </span><span class="si">{}</span><span class="s2">.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">file_id</span><span class="p">,</span><span class="n">code</span><span class="p">))</span>
+      <span class="k">return</span> <span class="p">{}</span>
+
+      <span class="c1"># For ex, response would look like this for a 404.</span>
+
+      <span class="c1"># {</span>
+      <span class="c1">#     &quot;@type&quot;: [</span>
+      <span class="c1">#         &quot;HTTPNotFound&quot;,</span>
+      <span class="c1">#         &quot;Error&quot;</span>
+      <span class="c1">#     ],</span>
+      <span class="c1">#     &quot;code&quot;: 404,</span>
+      <span class="c1">#     &quot;description&quot;: &quot;The resource could not be found.&quot;,</span>
+      <span class="c1">#     &quot;detail&quot;: &quot;/files/michael-snyder:test_file_1/upload&quot;,</span>
+      <span class="c1">#     &quot;status&quot;: &quot;error&quot;,</span>
+      <span class="c1">#     &quot;title&quot;: &quot;Not Found&quot;</span>
+      <span class="c1"># }</span>
+
+      <span class="c1"># You get a 403 when the &#39;status&#39; of the file object isn&#39;t set to &#39;uploading&#39;.</span>
+      <span class="c1"># You also get this when the file object no-longer has read access (was archived by wranglers).</span>
+
+    <span class="n">graph</span> <span class="o">=</span> <span class="n">response</span><span class="p">[</span><span class="s2">&quot;@graph&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">response</span><span class="p">[</span><span class="s2">&quot;@graph&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;upload_credentials&quot;</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="Connection.upload_file"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.Connection.upload_file">[docs]</a>  <span class="k">def</span> <span class="nf">upload_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">file_id</span><span class="p">,</span><span class="n">file_path</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Uses the AWS CLI to upload a local file or existing S3 object to the Portal for the indicated</span>
+<span class="sd">    file record.</span>
+
+<span class="sd">    Unfortunately, it doesn&#39;t appear that pulling a file into S3 is supported through the AWS API;</span>
+<span class="sd">    only existing S3 objects or local files can be pushed to a S3 bucket. External files must first</span>
+<span class="sd">    be downloaded and then pushed to the S3 bucket.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        file_id: `str`. An identifier of a `file` record.</span>
+<span class="sd">        file_path: `str`. the local path to the file to upload, or an S3 object (i.e s3://mybucket/test.txt).</span>
+<span class="sd">          If not set, defaults to `None` in which case the local file path will be extracted from the</span>
+<span class="sd">          record&#39;s `submitted_file_name` property.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        encode_utils.connection.FileUploadFailed: The return code of the AWS upload command was non-zero.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">debug_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">IN upload_file()</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">aws_creds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">set_aws_upload_config</span><span class="p">(</span><span class="n">file_id</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">aws_creds</span><span class="p">:</span>
+      <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;Cannot upload file for </span><span class="si">{}</span><span class="s2"> since upload credentials could not be generated.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">file_id</span><span class="p">)</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">log_error</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+      <span class="k">return</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">file_path</span><span class="p">:</span>
+      <span class="n">file_rec</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">rec_ids</span><span class="o">=</span><span class="n">file_id</span><span class="p">)</span>
+      <span class="k">try</span><span class="p">:</span>
+        <span class="n">file_path</span> <span class="o">=</span> <span class="n">file_rec</span><span class="p">[</span><span class="n">eup</span><span class="o">.</span><span class="n">Profile</span><span class="o">.</span><span class="n">SUBMITTED_FILE_PROP_NAME</span><span class="p">]</span>
+      <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span> <span class="c1">#submitted_file_name property not set:</span>
+        <span class="k">pass</span>
+      <span class="k">if</span> <span class="ow">not</span> <span class="n">file_path</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;No file path specified.&quot;</span><span class="p">)</span>
+
+    <span class="n">cmd</span> <span class="o">=</span> <span class="s2">&quot;aws s3 cp </span><span class="si">{file_path}</span><span class="s2"> </span><span class="si">{upload_url}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">file_path</span><span class="o">=</span><span class="n">file_path</span><span class="p">,</span><span class="n">upload_url</span><span class="o">=</span><span class="n">aws_creds</span><span class="p">[</span><span class="s2">&quot;UPLOAD_URL&quot;</span><span class="p">])</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">debug_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Running command </span><span class="si">{cmd}</span><span class="s2">.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">cmd</span><span class="o">=</span><span class="n">cmd</span><span class="p">))</span>
+    <span class="n">popen</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span>
+                             <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                             <span class="n">env</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">aws_creds</span><span class="p">),</span>
+                             <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span>
+                             <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">)</span>
+    <span class="n">stdout</span><span class="p">,</span><span class="n">stderr</span> <span class="o">=</span> <span class="n">popen</span><span class="o">.</span><span class="n">communicate</span><span class="p">()</span>
+    <span class="n">stdout</span> <span class="o">=</span> <span class="n">stdout</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
+    <span class="n">stderr</span> <span class="o">=</span> <span class="n">stderr</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
+    <span class="n">retcode</span> <span class="o">=</span> <span class="n">popen</span><span class="o">.</span><span class="n">returncode</span>
+    <span class="k">if</span> <span class="n">retcode</span><span class="p">:</span>
+      <span class="n">error_msg</span> <span class="o">=</span> <span class="s2">&quot;Failed to upload file &#39;</span><span class="si">{}</span><span class="s2">&#39; for </span><span class="si">{}</span><span class="s2">.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span><span class="n">file_id</span><span class="p">)</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">log_error</span><span class="p">(</span><span class="n">error_msg</span><span class="p">)</span>
+      <span class="n">error_msg</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot; Subprocess command &#39;</span><span class="si">{cmd}</span><span class="s2">&#39; failed with return code &#39;</span><span class="si">{retcode}</span><span class="s2">&#39;.&quot;</span>
+                   <span class="s2">&quot; Stdout is &#39;</span><span class="si">{stdout}</span><span class="s2">&#39;.  Stderr is &#39;</span><span class="si">{stderr}</span><span class="s2">&#39;.&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                      <span class="n">cmd</span><span class="o">=</span><span class="n">cmd</span><span class="p">,</span><span class="n">retcode</span><span class="o">=</span><span class="n">retcode</span><span class="p">,</span><span class="n">stdout</span><span class="o">=</span><span class="n">stdout</span><span class="p">,</span><span class="n">stderr</span><span class="o">=</span><span class="n">stderr</span><span class="p">)</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">debug_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">error_msg</span><span class="p">)</span>
+      <span class="k">raise</span> <span class="n">FileUploadFailed</span><span class="p">(</span><span class="n">error_msg</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">debug_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;AWS upload successful.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Connection.get_platforms_on_experiment"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.Connection.get_platforms_on_experiment">[docs]</a>  <span class="k">def</span> <span class="nf">get_platforms_on_experiment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">rec_id</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Looks at all FASTQ files on the specified experiment, and tallies up the varying sequencing</span>
+<span class="sd">    platforms that generated them.  The platform of a given file record is indicated by the</span>
+<span class="sd">    `platform` property. This is moreless used to verify that there aren&#39;t a mix of</span>
+<span class="sd">    multiple different platforms present as normally all reads should come from the same platform.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        rec_id: `str`. DCC identifier for an experiment.</span>
+<span class="sd">    Returns:</span>
+<span class="sd">        `list`: The de-duplicated list of platforms seen on the experiment&#39;s FASTQ files.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">exp_json</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">rec_ids</span><span class="o">=</span><span class="n">rec_id</span><span class="p">,</span><span class="n">frame</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+    <span class="n">files_json</span> <span class="o">=</span> <span class="n">exp_json</span><span class="p">[</span><span class="s2">&quot;original_files&quot;</span><span class="p">]</span>
+    <span class="n">platforms</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">files_json</span><span class="p">:</span>
+      <span class="k">if</span> <span class="ow">not</span> <span class="n">f</span><span class="p">[</span><span class="s2">&quot;file_format&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;fastq&quot;</span><span class="p">:</span>
+        <span class="k">continue</span>
+      <span class="n">platforms</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">f</span><span class="p">[</span><span class="s2">&quot;platform&quot;</span><span class="p">][</span><span class="s2">&quot;aliases&quot;</span><span class="p">])</span>
+    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">platforms</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="Connection.post_document"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.Connection.post_document">[docs]</a>  <span class="k">def</span> <span class="nf">post_document</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">download_filename</span><span class="p">,</span><span class="n">document</span><span class="p">,</span><span class="n">document_type</span><span class="p">,</span><span class="n">description</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;POSTS a document to the Portal.</span>
+
+<span class="sd">    The alias for the document will be the lab prefix plus the file name. The lab prefix is taken</span>
+<span class="sd">    as the value of the `DCC_LAB` environment variable, i.e. &#39;michael-snyder&#39;.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        download_filename: `str`. The name to give the document when downloading it from the ENCODE</span>
+<span class="sd">          portal.</span>
+<span class="sd">        document_type: `str`. For possible values, see</span>
+<span class="sd">          https://www.encodeproject.org/profiles/document.json. It appears that one should use</span>
+<span class="sd">          &quot;data QA&quot; for analysis results documents.</span>
+<span class="sd">        description: `str`. The description for the document.</span>
+<span class="sd">        document: `str`. Local file path to the document to be submitted.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        `str`: The DCC UUID of the new document.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">document_filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
+    <span class="n">document_alias</span> <span class="o">=</span> <span class="n">eu</span><span class="o">.</span><span class="n">LAB</span><span class="p">[</span><span class="n">eu</span><span class="o">.</span><span class="n">LAB_PROP_NAME</span><span class="p">]</span> <span class="o">+</span> <span class="s2">&quot;:&quot;</span> <span class="o">+</span> <span class="n">document_filename</span>
+    <span class="n">mime_type</span> <span class="o">=</span> <span class="n">mimetypes</span><span class="o">.</span><span class="n">guess_type</span><span class="p">(</span><span class="n">document_filename</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">mime_type</span><span class="p">:</span>
+      <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Couldn&#39;t guess MIME type for </span><span class="si">{}</span><span class="s2">.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">document_filename</span><span class="p">))</span>
+
+    <span class="c1">## Post information</span>
+    <span class="n">payload</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">payload</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">PROFILE_KEY</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;document&quot;</span>
+    <span class="n">payload</span><span class="p">[</span><span class="s2">&quot;aliases&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">document_alias</span><span class="p">]</span>
+    <span class="n">payload</span><span class="p">[</span><span class="s2">&quot;document_type&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">document_type</span>
+    <span class="n">payload</span><span class="p">[</span><span class="s2">&quot;description&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">description</span>
+
+    <span class="c1">#download_filename = library_alias.split(&quot;:&quot;)[1] + &quot;_relative_knockdown.jpeg&quot;</span>
+    <span class="n">attachment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">set_attachment</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
+
+    <span class="n">payload</span><span class="p">[</span><span class="s1">&#39;attachment&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">attachment</span>
+
+    <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="n">payload</span><span class="o">=</span><span class="n">payload</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">response</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="Connection.link_document"><a class="viewcode-back" href="../../connection.html#encode_utils.connection.Connection.link_document">[docs]</a>  <span class="k">def</span> <span class="nf">link_document</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">rec_id</span><span class="p">,</span><span class="n">document_id</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Links an existing `document` record on the Portal to some other record on the Portal via</span>
+<span class="sd">    the latter&#39;s `documents` property.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        rec_id: `str`. A DCC object identifier of the record to link the document to.</span>
+<span class="sd">        document_id: `str`. An identifier of a `document` record.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="c1">#Need to compare the documents at the primary ID level (`@id` property) in order to ensure the</span>
+    <span class="c1"># document isn&#39;t already linked. If not comparing at this identifier type and instead some</span>
+    <span class="c1"># other type (i.e. alias, uuid), then the document will be relinked as a duplicate.</span>
+
+    <span class="n">doc_json</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ignore404</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">rec_ids</span><span class="o">=</span><span class="n">document_id</span><span class="p">)</span>
+    <span class="n">doc_primary_id</span> <span class="o">=</span> <span class="n">doc_json</span><span class="p">[</span><span class="s2">&quot;@id&quot;</span><span class="p">]</span>
+
+    <span class="n">rec_json</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ignore404</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">rec_ids</span><span class="o">=</span><span class="n">rec_id</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+      <span class="n">rec_document_primary_ids</span> <span class="o">=</span> <span class="n">rec_json</span><span class="p">[</span><span class="s2">&quot;documents&quot;</span><span class="p">]</span>
+    <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+      <span class="c1">#There aren&#39;t any documents at present.</span>
+      <span class="n">rec_document_primary_ids</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">if</span> <span class="n">doc_primary_id</span> <span class="ow">in</span> <span class="n">rec_document_primary_ids</span><span class="p">:</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">debug_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Will not attempt to link document </span><span class="si">{}</span><span class="s2"> to </span><span class="si">{}</span><span class="s2"> since it is already linked.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">document_id</span><span class="p">,</span><span class="n">rec_id</span><span class="p">))</span>
+      <span class="k">return</span>
+
+    <span class="c1">#Add primary ID of new document to link.</span>
+    <span class="n">rec_document_primary_ids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">doc_primary_id</span><span class="p">)</span>
+    <span class="c1">#Originally in form of [u&#39;/documents/ba93f5cc-a470-41a2-842f-2cb3befbeb60/&#39;,</span>
+    <span class="c1">#                       u&#39;/documents/tg81g5aa-a580-01a2-842f-2cb5iegcea03, ...]</span>
+    <span class="c1">#Strip off the /documents/ prefix from each document UUID:</span>
+    <span class="n">payload</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">payload</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">ENCID_KEY</span><span class="p">]</span> <span class="o">=</span> <span class="n">rec_id</span>
+    <span class="n">payload</span><span class="p">[</span><span class="s2">&quot;documents&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rec_document_primary_ids</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">patch</span><span class="p">(</span><span class="n">payload</span><span class="o">=</span><span class="n">payload</span><span class="p">)</span></div></div>
+
+<span class="c1">#When appending &quot;?datastore=database&quot; to the URL. As Esther stated: &quot;_indexer to the end of the</span>
+<span class="c1"># URL to see the status of elastic search like</span>
+<span class="c1"># https://www.encodeproject.org/_indexer if it&#39;s indexing it will say the status is &quot;indexing&quot;,</span>
+<span class="c1"># versus waiting&quot; and the results property will indicate the last object that was indexed.&quot;</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2018, Nathaniel Watson.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.6</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

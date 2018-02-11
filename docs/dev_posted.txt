@@ -1,0 +1,1 @@
+2018-02-03 21:52:45,852:post:/Users/nathankw/software/encode_utils/encode_utils/connection.py:	michael-snyder:log_eu_dev_debug.txt	263459dc-ddcd-4d24-9844-6c49af14031e

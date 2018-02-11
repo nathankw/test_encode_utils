@@ -1,0 +1,4 @@
+2018-02-03 21:52:05,369:error.encode_utils.connection:	Failed to POST michael-snyder:log_eu_dev_debug.txt
+2018-02-03 21:54:34,549:error.encode_utils.connection:	Failed to POST michael-snyder:log_eu_dev_debug.txt
+2018-02-03 21:54:59,914:error.encode_utils.connection:	Will not post michael-snyder:log_eu_dev_debug.txt because it already exists.
+2018-02-03 22:07:23,480:error.encode_utils.connection:	Failed to PATCH b3ee44af-8226-48f4-951c-54221a002163

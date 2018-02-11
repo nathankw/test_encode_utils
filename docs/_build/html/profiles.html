@@ -1,0 +1,229 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>encode_utils.profiles &#8212; ENCODE Utils 0.3.0 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.3.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="encode_utils.tests.test_utils" href="tests/test_utils.html" />
+    <link rel="prev" title="encode_utils.connection" href="connection.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="module-encode_utils.profiles">
+<span id="encode-utils-profiles"></span><h1>encode_utils.profiles<a class="headerlink" href="#module-encode_utils.profiles" title="Permalink to this headline">¶</a></h1>
+<p>Contains a <code class="docutils literal"><span class="pre">Profile</span></code> class for working with profiles on the ENCODE Portal.  Note that the terms
+‘profile’ and ‘schema’ are used interchangeably in this package.</p>
+<dl class="data">
+<dt id="encode_utils.profiles.DEBUG_LOGGER">
+<code class="descclassname">encode_utils.profiles.</code><code class="descname">DEBUG_LOGGER</code><em class="property"> = &lt;logging.Logger object&gt;</em><a class="headerlink" href="#encode_utils.profiles.DEBUG_LOGGER" title="Permalink to this definition">¶</a></dt>
+<dd><p>A debug <code class="docutils literal"><span class="pre">logging</span></code> instance.</p>
+</dd></dl>
+
+<dl class="data">
+<dt id="encode_utils.profiles.ERROR_LOGGER">
+<code class="descclassname">encode_utils.profiles.</code><code class="descname">ERROR_LOGGER</code><em class="property"> = &lt;logging.Logger object&gt;</em><a class="headerlink" href="#encode_utils.profiles.ERROR_LOGGER" title="Permalink to this definition">¶</a></dt>
+<dd><p>An error <code class="docutils literal"><span class="pre">logging</span></code> instance.</p>
+</dd></dl>
+
+<dl class="exception">
+<dt id="encode_utils.profiles.UnknownProfile">
+<em class="property">exception </em><code class="descclassname">encode_utils.profiles.</code><code class="descname">UnknownProfile</code><a class="reference internal" href="_modules/encode_utils/profiles.html#UnknownProfile"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#encode_utils.profiles.UnknownProfile" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">exceptions.Exception</span></code></p>
+<p>Raised when the profile ID in question doesn’t match any known profile ID.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="encode_utils.profiles.get_profiles">
+<code class="descclassname">encode_utils.profiles.</code><code class="descname">get_profiles</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/encode_utils/profiles.html#get_profiles"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#encode_utils.profiles.get_profiles" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates a dictionary storing all public profiles on the Portal.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><cite>dict</cite> where each key is the profile’s ID, and each value is a given profile’s
+JSON schema.  Each key is extracted from the profile’s <cite>id</cite> property, after a
+little formatting first.  The formatting works by removing the
+‘/profiles/’ prefix and the ‘.json’ suffix.  For example, the value of the <cite>id</cite> property
+for the <cite>genetic_modification.json</cite> profile is
+<cite>/profiles/genetic_modification.json</cite>. The corresponding key in this <cite>dict</cite> is
+<cite>genetic_modification</cite>.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body"><cite>dict</cite></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="class">
+<dt id="encode_utils.profiles.Profile">
+<em class="property">class </em><code class="descclassname">encode_utils.profiles.</code><code class="descname">Profile</code><span class="sig-paren">(</span><em>profile_id</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/encode_utils/profiles.html#Profile"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#encode_utils.profiles.Profile" title="Permalink to this definition">¶</a></dt>
+<dd><p>Encapsulates knowledge about the existing profiles on the Portal and contains useful methods
+for working with a given profile.</p>
+<p>A defining purpose of this class is to validate the profile ID specified in a POST payload passed
+to <code class="docutils literal"><span class="pre">encode_utils.connection.Connection.post()</span></code>.  This class is used to ensure that the profile
+specified there is a known profile on the Portal.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>profile_id</strong> – str. Typically the value of a record’s <cite>&#64;id</cite> property. It will be
+normalized to match the syntax of the profile ID keys in the <cite>dict</cite>
+<code class="docutils literal"><span class="pre">encode_utils.profiles.Profile.PROFILES</span></code> (which is set to the return value of
+the function <code class="docutils literal"><span class="pre">encode_utils.profiles.Profile</span></code>). You can also pass in the pre-normalized
+profile ID.</td>
+</tr>
+</tbody>
+</table>
+<dl class="attribute">
+<dt id="encode_utils.profiles.Profile.AWARDLESS_PROFILE_IDS">
+<code class="descname">AWARDLESS_PROFILE_IDS</code><em class="property"> = [u'lab', u'image', u'analysis_step_version', u'analysis_step', u'access_key_admin', u'platform', u'treatment', u'source', u'replicate', u'software_version', u'analysis_step_run', u'award', u'user', u'target', u'organism']</em><a class="headerlink" href="#encode_utils.profiles.Profile.AWARDLESS_PROFILE_IDS" title="Permalink to this definition">¶</a></dt>
+<dd><p>List of profile IDs that don’t have the <cite>award</cite> and <cite>lab</cite> properties. Consulted in
+<code class="docutils literal"><span class="pre">encode_utils.connection.Connection.post()</span></code> to determine whether to set defaults for the
+<cite>lab</cite> and <cite>award</cite> properties of a given profile.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="encode_utils.profiles.Profile.FILE_PROFILE_ID">
+<code class="descname">FILE_PROFILE_ID</code><em class="property"> = 'file'</em><a class="headerlink" href="#encode_utils.profiles.Profile.FILE_PROFILE_ID" title="Permalink to this definition">¶</a></dt>
+<dd><p>Constant storing the <cite>file.json</cite> profile’s ID.
+This is asserted for inclusion in <code class="docutils literal"><span class="pre">Profile.PROFILES</span></code>.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="encode_utils.profiles.Profile.SUBMITTED_FILE_PROP_NAME">
+<code class="descname">SUBMITTED_FILE_PROP_NAME</code><em class="property"> = 'submitted_file_name'</em><a class="headerlink" href="#encode_utils.profiles.Profile.SUBMITTED_FILE_PROP_NAME" title="Permalink to this definition">¶</a></dt>
+<dd><p>Constant storing a property name of the <cite>file.json</cite> profile.
+The stored name is asserted for inclusion in the set of <cite>File</cite> properties.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="encode_utils.profiles.Profile.MD5SUM_NAME_PROP_NAME">
+<code class="descname">MD5SUM_NAME_PROP_NAME</code><em class="property"> = 'md5sum'</em><a class="headerlink" href="#encode_utils.profiles.Profile.MD5SUM_NAME_PROP_NAME" title="Permalink to this definition">¶</a></dt>
+<dd><p>Constant storing a property name of the <cite>file.json</cite> profile.
+The stored name is asserted for inclusion in the set of <cite>File</cite> properties.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="encode_utils.profiles.Profile.profile_id">
+<code class="descname">profile_id</code><em class="property"> = u'trimming_quality_metric'</em><a class="headerlink" href="#encode_utils.profiles.Profile.profile_id" title="Permalink to this definition">¶</a></dt>
+<dd><p>The normalized version of the passed-in <cite>profile_id</cite> to self.__init__(). The normalization
+is neccessary in order to match the format of the profile IDs in <cite>Profile.PROFILES</cite>.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="encode_utils.profiles.Profile._set_profile_id">
+<code class="descname">_set_profile_id</code><span class="sig-paren">(</span><em>profile_id</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/encode_utils/profiles.html#Profile._set_profile_id"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#encode_utils.profiles.Profile._set_profile_id" title="Permalink to this definition">¶</a></dt>
+<dd><p>Normalizes the profile_id so that it matches the format of the profile IDs stored in
+<cite>Profile.PROFILES</cite>, and ensures that the normalized profile ID is a member of this list.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>profile_id</strong> – <cite>str</cite>. The value of the <code class="docutils literal"><span class="pre">profile_id</span></code> argument in self.__init__()``.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">The normalized profile ID.</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><cite>str</cite></td>
+</tr>
+<tr class="field-even field"><th class="field-name">Raises:</th><td class="field-body"><a class="reference internal" href="#encode_utils.profiles.UnknownProfile" title="encode_utils.profiles.UnknownProfile"><code class="xref py py-exc docutils literal"><span class="pre">UnknownProfile</span></code></a> – The normalized profile ID is not a member of the list <cite>Profile.PROFILES</cite>.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="encode_utils.profiles.Profile.get_profile">
+<code class="descname">get_profile</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/encode_utils/profiles.html#Profile.get_profile"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#encode_utils.profiles.Profile.get_profile" title="Permalink to this definition">¶</a></dt>
+<dd><p>Provides the JSON schema for the specified profile ID.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><cite>dict</cite> representing the profile’s JSON schema.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body"><cite>dict</cite></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="connection.html" title="previous chapter">encode_utils.connection</a></li>
+      <li>Next: <a href="tests/test_utils.html" title="next chapter">encode_utils.tests.test_utils</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2018, Nathaniel Watson.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.6</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/profiles.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,13 @@
+2018-02-06 17:45:42,802:debug:	Searching DCC with query https://www.encodeproject.org/search/?/assay_title=ChiP-seq&biosample_type=primary+cell&type=Experiment&organ_slims=blood.
+2018-02-06 17:45:47,180:debug:	Searching DCC with query https://www.encodeproject.org/search/?/assay_title=ChiP-seq&biosample_type=primary+cell&type=Experiment&organ_slims=blood.
+2018-02-06 17:49:28,604:debug:	Searching DCC with query https://www.encodeproject.org/search/?assay_title=ChiP-seq&biosample_type=primary+cell&organ_slims=blood&type=Experiment.
+2018-02-06 17:50:40,286:debug:	Searching DCC with query https://www.encodeproject.org/search/?assay_title=ChIP-seq&biosample_type=primary+cell&organ_slims=blood&type=Experiment.
+2018-02-06 17:50:44,308:debug:	Searching DCC with query https://www.encodeproject.org/search/?assay_title=ChIP-seq&biosample_type=primary+cell&organ_slims=blood&type=Experiment.
+2018-02-06 17:52:31,996:debug:	Searching DCC with query https://www.encodeproject.org/search/?assay_title=ChIP-seq&biosample_type=primary+cell&organ_slims=blood&type=Experiment&limit=all.
+2018-02-06 17:55:55,971:debug:	Searching DCC with query https://www.encodeproject.org/search/?limit=all&type=Experiment&biosample_type=primary+cell&assay_title=ChIP-seq&organ_slims=blood.
+2018-02-06 17:56:01,190:debug:	Searching DCC with query https://www.encodeproject.org/search/?limit=all&type=Experiment&biosample_type=primary+cell&assay_title=ChIP-seq&organ_slims=blood.
+2018-02-06 17:56:14,054:debug:	Searching DCC with query https://www.encodeproject.org/search/?limit=all&type=Experiment&biosample_type=primary+cell&assay_title=ChIP-seq&organ_slims=blood.
+2018-02-06 17:56:52,398:debug:	Searching DCC with query https://www.encodeproject.org/search/?limit=all&type=Experiment&biosample_type=primary+cell&assay_title=ChIP-seq&organ_slims=blood.
+2018-02-06 17:57:28,502:debug:	Searching DCC with query https://www.encodeproject.org/search/?limit=1&type=Experiment&biosample_type=primary+cell&assay_title=ChIP-seq&organ_slims=blood.
+2018-02-06 17:57:31,882:debug:	Searching DCC with query https://www.encodeproject.org/search/?limit=all&type=Experiment&biosample_type=primary+cell&assay_title=ChIP-seq&organ_slims=blood.
+2018-02-06 17:58:59,808:debug:	Searching DCC with query https://www.encodeproject.org/search/?limit=1&type=Experiment&biosample_type=primary+cell&assay_title=ChIP-seq&organ_slims=blood.

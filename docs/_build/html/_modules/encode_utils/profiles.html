@@ -1,0 +1,240 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>encode_utils.profiles &#8212; ENCODE Utils 0.3.0 documentation</title>
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.3.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for encode_utils.profiles</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+
+<span class="c1">###</span>
+<span class="c1"># © 2018 The Board of Trustees of the Leland Stanford Junior University</span>
+<span class="c1"># Nathaniel Watson</span>
+<span class="c1"># nathankw@stanford.edu</span>
+<span class="c1">###</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Contains a ``Profile`` class for working with profiles on the ENCODE Portal.  Note that the terms </span>
+<span class="sd">&#39;profile&#39; and &#39;schema&#39; are used interchangeably in this package.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">requests</span>
+
+<span class="kn">import</span> <span class="nn">encode_utils</span> <span class="k">as</span> <span class="nn">eu</span>
+<span class="kn">import</span> <span class="nn">encode_utils.utils</span> <span class="k">as</span> <span class="nn">euu</span>
+
+
+<span class="c1">#: A debug ``logging`` instance.</span>
+<span class="n">DEBUG_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">eu</span><span class="o">.</span><span class="n">DEBUG_LOGGER_NAME</span> <span class="o">+</span> <span class="s2">&quot;.&quot;</span> <span class="o">+</span> <span class="vm">__name__</span><span class="p">)</span>
+<span class="c1">#: An error ``logging`` instance.</span>
+<span class="n">ERROR_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">eu</span><span class="o">.</span><span class="n">ERROR_LOGGER_NAME</span> <span class="o">+</span> <span class="s2">&quot;.&quot;</span> <span class="o">+</span> <span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="UnknownProfile"><a class="viewcode-back" href="../../profiles.html#encode_utils.profiles.UnknownProfile">[docs]</a><span class="k">class</span> <span class="nc">UnknownProfile</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+  <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">  Raised when the profile ID in question doesn&#39;t match any known profile ID.</span>
+<span class="sd">  &quot;&quot;&quot;</span>
+  <span class="k">pass</span></div>
+
+<div class="viewcode-block" id="get_profiles"><a class="viewcode-back" href="../../profiles.html#encode_utils.profiles.get_profiles">[docs]</a><span class="k">def</span> <span class="nf">get_profiles</span><span class="p">():</span>
+  <span class="sd">&quot;&quot;&quot;Creates a dictionary storing all public profiles on the Portal.</span>
+
+<span class="sd">  Returns:</span>
+<span class="sd">      `dict`: `dict` where each key is the profile&#39;s ID, and each value is a given profile&#39;s </span>
+<span class="sd">      JSON schema.  Each key is extracted from the profile&#39;s `id` property, after a </span>
+<span class="sd">      little formatting first.  The formatting works by removing the </span>
+<span class="sd">      &#39;/profiles/&#39; prefix and the &#39;.json&#39; suffix.  For example, the value of the `id` property </span>
+<span class="sd">      for the `genetic_modification.json` profile is</span>
+<span class="sd">      `/profiles/genetic_modification.json`. The corresponding key in this `dict` is </span>
+<span class="sd">      `genetic_modification`.</span>
+<span class="sd">  &quot;&quot;&quot;</span>
+  <span class="n">profiles</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">eu</span><span class="o">.</span><span class="n">PROFILES_URL</span> <span class="o">+</span> <span class="s2">&quot;?format=json&quot;</span><span class="p">,</span>
+                          <span class="n">timeout</span><span class="o">=</span><span class="n">eu</span><span class="o">.</span><span class="n">TIMEOUT</span><span class="p">,</span>
+                          <span class="n">headers</span><span class="o">=</span><span class="n">euu</span><span class="o">.</span><span class="n">REQUEST_HEADERS_JSON</span><span class="p">)</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+  <span class="c1">#Remove the &quot;private&quot; profiles, since thiese have differing semantics.</span>
+  <span class="n">private_profiles</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">profiles</span> <span class="k">if</span> <span class="n">x</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">)]</span> <span class="c1">#i.e. _subtypes</span>
+  <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">private_profiles</span><span class="p">:</span>
+    <span class="n">profiles</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+
+  <span class="n">profile_id_hash</span> <span class="o">=</span> <span class="p">{}</span> <span class="c1">#Instead of name as key, profile ID is key.</span>
+  <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">profiles</span><span class="p">:</span> <span class="c1">#i.e. name=GeneticModification</span>
+    <span class="n">profile_id</span> <span class="o">=</span> <span class="n">profiles</span><span class="p">[</span><span class="n">name</span><span class="p">][</span><span class="s2">&quot;id&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;.json&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">profile_id_hash</span><span class="p">[</span><span class="n">profile_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">profiles</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+  <span class="k">return</span> <span class="n">profile_id_hash</span> </div>
+
+<div class="viewcode-block" id="Profile"><a class="viewcode-back" href="../../profiles.html#encode_utils.profiles.Profile">[docs]</a><span class="k">class</span> <span class="nc">Profile</span><span class="p">:</span>
+  <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">  Encapsulates knowledge about the existing profiles on the Portal and contains useful methods</span>
+<span class="sd">  for working with a given profile.</span>
+
+<span class="sd">  A defining purpose of this class is to validate the profile ID specified in a POST payload passed</span>
+<span class="sd">  to ``encode_utils.connection.Connection.post()``.  This class is used to ensure that the profile </span>
+<span class="sd">  specified there is a known profile on the Portal.</span>
+
+<span class="sd">  Args:</span>
+<span class="sd">      profile_id: str. Typically the value of a record&#39;s `@id` property. It will be</span>
+<span class="sd">        normalized to match the syntax of the profile ID keys in the `dict`</span>
+<span class="sd">        ``encode_utils.profiles.Profile.PROFILES`` (which is set to the return value of</span>
+<span class="sd">        the function ``encode_utils.profiles.Profile``). You can also pass in the pre-normalized </span>
+<span class="sd">        profile ID.</span>
+<span class="sd">  &quot;&quot;&quot;</span>
+  <span class="c1">#Constant (`dict`) set to the return value of the function ``encode_utils.profiles.get_profiles()``. </span>
+  <span class="c1"># See documentation there for details.</span>
+  <span class="c1"># Don&#39;t comment for sphinx since it will break the build process on Read The Docs because the </span>
+  <span class="c1"># list value is so large.</span>
+  <span class="n">PROFILES</span> <span class="o">=</span> <span class="n">get_profiles</span><span class="p">()</span>
+
+  <span class="c1">#: List of profile IDs that don&#39;t have the `award` and `lab` properties. Consulted in </span>
+  <span class="c1">#: ``encode_utils.connection.Connection.post()`` to determine whether to set defaults for the </span>
+  <span class="c1">#: `lab` and `award` properties of a given profile.</span>
+  <span class="n">AWARDLESS_PROFILE_IDS</span> <span class="o">=</span> <span class="p">[]</span>
+  <span class="k">for</span> <span class="n">profile_id</span> <span class="ow">in</span> <span class="n">PROFILES</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">eu</span><span class="o">.</span><span class="n">AWARD_PROP_NAME</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">PROFILES</span><span class="p">[</span><span class="n">profile_id</span><span class="p">][</span><span class="s2">&quot;properties&quot;</span><span class="p">]:</span>
+      <span class="n">AWARDLESS_PROFILE_IDS</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">profile_id</span><span class="p">)</span>
+
+  <span class="c1">#: Constant storing the `file.json` profile&#39;s ID.</span>
+  <span class="c1">#: This is asserted for inclusion in ``Profile.PROFILES``.</span>
+  <span class="n">FILE_PROFILE_ID</span> <span class="o">=</span> <span class="s2">&quot;file&quot;</span>
+  <span class="k">try</span><span class="p">:</span>
+    <span class="k">assert</span><span class="p">(</span><span class="n">FILE_PROFILE_ID</span> <span class="ow">in</span> <span class="n">PROFILES</span><span class="p">)</span>
+  <span class="k">except</span> <span class="ne">AssertionError</span><span class="p">:</span>
+    <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Error: The profile for file.json has underwent a name change apparently and is no longer known to this package.&quot;</span><span class="p">)</span>
+
+  <span class="c1">#: Constant storing a property name of the `file.json` profile.</span>
+  <span class="c1">#: The stored name is asserted for inclusion in the set of `File` properties.</span>
+  <span class="n">SUBMITTED_FILE_PROP_NAME</span> <span class="o">=</span> <span class="s2">&quot;submitted_file_name&quot;</span>
+  <span class="k">try</span><span class="p">:</span>
+    <span class="k">assert</span><span class="p">(</span><span class="n">SUBMITTED_FILE_PROP_NAME</span> <span class="ow">in</span> <span class="n">PROFILES</span><span class="p">[</span><span class="n">FILE_PROFILE_ID</span><span class="p">][</span><span class="s2">&quot;properties&quot;</span><span class="p">])</span>
+  <span class="k">except</span> <span class="ne">AssertionError</span><span class="p">:</span>
+    <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Error: The profile for file.json no longer includes the property </span><span class="si">{}</span><span class="s2">.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">FILE_PROFILE_ID</span><span class="p">))</span>
+
+  <span class="c1">#: Constant storing a property name of the `file.json` profile.</span>
+  <span class="c1">#: The stored name is asserted for inclusion in the set of `File` properties.</span>
+  <span class="n">MD5SUM_NAME_PROP_NAME</span> <span class="o">=</span> <span class="s2">&quot;md5sum&quot;</span>
+  <span class="k">try</span><span class="p">:</span>
+    <span class="k">assert</span><span class="p">(</span><span class="n">MD5SUM_NAME_PROP_NAME</span> <span class="ow">in</span> <span class="n">PROFILES</span><span class="p">[</span><span class="n">FILE_PROFILE_ID</span><span class="p">][</span><span class="s2">&quot;properties&quot;</span><span class="p">])</span>
+  <span class="k">except</span> <span class="ne">AssertionError</span><span class="p">:</span>
+    <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Error: The profile for file.json no longer includes the property </span><span class="si">{}</span><span class="s2">.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">MD5SUM_NAME_PROP_NAME</span><span class="p">))</span>
+  
+
+  <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">profile_id</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Args:</span>
+<span class="sd">        profile_id: `str`. Typically the value of a record&#39;s `@id` property.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1">#: The normalized version of the passed-in `profile_id` to self.__init__(). The normalization</span>
+    <span class="c1">#: is neccessary in order to match the format of the profile IDs in `Profile.PROFILES`.</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">profile_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_set_profile_id</span><span class="p">(</span><span class="n">profile_id</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Profile._set_profile_id"><a class="viewcode-back" href="../../profiles.html#encode_utils.profiles.Profile._set_profile_id">[docs]</a>  <span class="k">def</span> <span class="nf">_set_profile_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">profile_id</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Normalizes the profile_id so that it matches the format of the profile IDs stored in </span>
+<span class="sd">    `Profile.PROFILES`, and ensures that the normalized profile ID is a member of this list.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        profile_id: `str`. The value of the ``profile_id`` argument in self.__init__()``.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        `str`: The normalized profile ID.</span>
+<span class="sd">    Raises:</span>
+<span class="sd">        UnknownProfile: The normalized profile ID is not a member of the list `Profile.PROFILES`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">orig_profile</span> <span class="o">=</span> <span class="n">profile_id</span>
+    <span class="n">profile_id</span> <span class="o">=</span> <span class="n">profile_id</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+    <span class="c1">#Multi-word profile names are hypen-separated, i.e. genetic-modifications.</span>
+    <span class="n">profile_id</span> <span class="o">=</span> <span class="n">profile_id</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">,</span><span class="s2">&quot;_&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">profile_id</span> <span class="ow">in</span> <span class="n">Profile</span><span class="o">.</span><span class="n">PROFILES</span><span class="p">:</span>
+      <span class="n">profile_id</span> <span class="o">=</span> <span class="n">profile_id</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s2">&quot;s&quot;</span><span class="p">)</span>
+      <span class="k">if</span> <span class="ow">not</span> <span class="n">profile_id</span> <span class="ow">in</span> <span class="n">Profile</span><span class="o">.</span><span class="n">PROFILES</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">UnknownProfile</span><span class="p">(</span><span class="s2">&quot;Unknown profile ID &#39;</span><span class="si">{}</span><span class="s2">&#39;.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">orig_profile</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">profile_id</span></div>
+
+<div class="viewcode-block" id="Profile.get_profile"><a class="viewcode-back" href="../../profiles.html#encode_utils.profiles.Profile.get_profile">[docs]</a>  <span class="k">def</span> <span class="nf">get_profile</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Provides the JSON schema for the specified profile ID.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        `dict`: `dict` representing the profile&#39;s JSON schema.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">Profile</span><span class="o">.</span><span class="n">PROFILES</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">profile_id</span><span class="p">]</span></div></div>
+
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2018, Nathaniel Watson.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.6</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
