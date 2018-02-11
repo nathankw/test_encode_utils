@@ -1,3 +1,7 @@
+.wy-table-responsive table td:first {
+  width: 15%;
+}
+
 /* The below comes 
    from https://sphinx-argparse.readthedocs.io/en/stable/misc.html#text-wrapping-in-argument-tables
 */
