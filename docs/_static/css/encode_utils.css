@@ -1,12 +1,3 @@
-.wy-nav-content {
-  max-width: 1000px;
-  /* Default on RTD is 800px. */
-}
-
-.wy-table-responsive table th {
-  max-width: 20%;
-}
-
 /* The below comes 
    from https://sphinx-argparse.readthedocs.io/en/stable/misc.html#text-wrapping-in-argument-tables
 */
