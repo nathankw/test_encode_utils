@@ -4,7 +4,7 @@
 }
 
 .wy-table-responsive table th {
-  white-space: nowrap;
+  width: 20%;
 }
 
 /* The below comes 
