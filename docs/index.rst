@@ -47,17 +47,6 @@ Client API Modules
 
    encode_utils
    utils
-   connection
-   profiles 
-
-Unit Tests
-----------
-
-.. toctree::
-   :maxdepth: 3
-
-   tests/test_utils
-   tests/test_connection
 
 Indices and tables
 ==================
