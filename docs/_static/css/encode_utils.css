@@ -1,14 +1,6 @@
-.wy-table-responsive table td:first-child {
-  width: 15%;
-}
-
-/* The below comes 
-   from https://sphinx-argparse.readthedocs.io/en/stable/misc.html#text-wrapping-in-argument-tables
-*/
 .wy-table-responsive table td {
     white-space: normal;
 }
 .wy-table-responsive {
     overflow: visible;
 }
-

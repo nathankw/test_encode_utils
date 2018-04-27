@@ -8,12 +8,17 @@
 ###
 
 """
-Retrieves the aliases for the given set of DCC record identifiers.
+Checks if the specified record identifiers are found on the Portal or not by doing a GET request
+on each one. If a 404 (not found) response is returned, then this identifier is written to the
+specified output file.
 """
 
 import argparse
+
 from encode_utils.connection import Connection
 from encode_utils.parent_argparser import dcc_login_parser
+from encode_utils.profiles import Profile
+
 # dcc_login_parser  contains the arguments needed for logging in to the
 # ENCODE Portal, including which env.
 
@@ -24,14 +29,14 @@ def get_parser():
         description=__doc__,
         formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("-i", "--infile", required=True, help="""
-    Input file containing ENCODE object identifiers (one per line), i.e. UUID, accession, or @id.
-    Empty lines and lines beginning with a '#' will be ignored.
-  """)
+    Input file containing record identifiers, one per line. Any line starting with a
+    '#' will be skipped.
+    """)
 
     parser.add_argument("-o", "--outfile", required=True, help="""
-    The output file, which is the same as the input file except for the addition of the
-    tab-delimited columns - one for each alias.
-  """)
+    Output file containing a subset of the input file. Only record IDs that weren't found on the
+    Portal will be written to this file, one per line.
+    """)
     return parser
 
 
@@ -44,21 +49,18 @@ def main():
     outfile = args.outfile
     dcc_mode = args.dcc_mode
 
-    conn = Connection(dcc_mode=dcc_mode)
+    conn = Connection(dcc_mode)
 
     fh = open(infile, 'r')
     fout = open(outfile, 'w')
     for line in fh:
-        rec = line.strip("\n").split("\t")[0]
-        if not rec or rec.startswith("#"):
-            fout.write(line)
+        rec_id = line.strip()
+        if not rec_id or rec_id.startswith("#"):
             continue
-        rec = conn.get(rec_ids=rec, ignore404=False)
-        aliases = rec["aliases"]
-        for a in aliases:
-            line = [line.strip("\n")]
-            outline = line.extend(aliases)
-            fout.write("\t".join(line) + "\n")
+        rec = conn.get(rec_id, ignore404=True)
+        if not rec:
+            print("'{}' not found.".format(rec_id))
+            fout.write(rec_id + "\n")
     fout.close()
     fh.close()
 

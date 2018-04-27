@@ -32,6 +32,12 @@ Scripts
     :maxdepth: 1
    
     registration <scripts/eu_register>
+    scripts/eu_add_controlled_by.rst
+    scripts/eu_check_not_posted.rst
+    scripts/eu_get_aliases.rst
+    scripts/eu_get_replicate_fastq_encffs.rst
+    scripts/eu_get_replicate_numbers.rst
+    scripts/eu_report_fastq_content_errors.rst
 
 Client API Modules
 ------------------

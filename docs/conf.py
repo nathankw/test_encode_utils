@@ -96,7 +96,7 @@ todo_include_todos = True
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = "sphinxdoc"
+#html_theme = "classic"
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -107,7 +107,7 @@ html_theme = "sphinxdoc"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+html_static_path = ['_static/css/encode_utils.css']
 
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.
@@ -178,7 +178,7 @@ texinfo_documents = [
      'Miscellaneous'),
 ]
 
-#: Define setup() function as descried in Read The Docs at
-#: http://docs.readthedocs.io/en/latest/guides/adding-custom-css.html
-def setup(app):
-    app.add_stylesheet('css/encode_utils.css')
+#: Define setup() function as descried in Read The Docs at                                             
+#: http://docs.readthedocs.io/en/latest/guides/adding-custom-css.html                                  
+def setup(app):                                                                                        
+    app.add_stylesheet('css/encode_utils.css') 
